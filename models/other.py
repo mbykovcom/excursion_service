@@ -21,3 +21,8 @@ class Token(BaseModel):
 class Statistics(BaseModel):
     type: str = Field(..., description='Type statistics')
     data: dict = Field(..., description='A dictionary, where the key is the x value, and the value is the y value')
+
+
+class Error(BaseModel):
+    code: int = Field(..., description="Error code")
+    detail: str = Field(..., description='Error details')
