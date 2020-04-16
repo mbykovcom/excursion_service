@@ -1,6 +1,7 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field
+from pydantic.networks import EmailStr
 
 
 class UserIn(BaseModel):
