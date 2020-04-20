@@ -13,6 +13,10 @@ class Config(object):
     EMAIL_PASSWORD = os.environ.get('EMAIL_PASSWORD', '9Fhc7RnZ1kMV')
     ALGORITHM = os.environ.get('ALGORITHM', "HS256")
     ACCESS_TOKEN_EXPIRE_MINUTES = os.environ.get('ACCESS_TOKEN_EXPIRE_MINUTES', 30)
+    REGISTRATION_EXPIRE_HOURS = os.environ.get('REGISTRATION_EXPIRE_HOURS', 24)
+    ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'admin@realty.ru')
+    ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin')
+    URL_SERVICE = os.environ.get('URL_SERVICE', 'http://0.0.0.0')
 
 
 class ConfigCelery:

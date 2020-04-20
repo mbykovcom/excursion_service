@@ -1,13 +1,15 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from pydantic import BaseModel, Field
 from pydantic.networks import EmailStr
 
 
-class UserIn(BaseModel):
+class UserAuth(BaseModel):
     email: EmailStr = Field(..., description='The email a user')
-    password: str = Field(..., description='The password a user',
-                          min_length=4)  # TODO: Сделать проверку сложности пароля
+    password: str = Field(..., description='The password a user', min_length=4) # TODO: Сделать проверку сложности пароля
+
+
+class UserIn(UserAuth):
     name: str = Field(..., description='User name in service')
 
 
@@ -20,8 +22,8 @@ class UserOut(BaseModel):
 
 
 class User:
-    def __init__(self, _id: int, email: str,  hash_password: str, name: str, role: str = 'user', is_active: bool = False,
-                 date_registration: datetime = datetime.now()):
+    def __init__(self, email: str, hash_password: str, name: str, _id: int = None, role: str = 'user',
+                 is_active: bool = False, date_registration: datetime = datetime.now()):
         self._id: int = _id
         self.email: str = email
         self.hash_password: str = hash_password

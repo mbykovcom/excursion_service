@@ -20,9 +20,9 @@ services:
       - 6379:6379
 
   excursion_service:
-      build: .
+      build: ""
       environment:
-        - URL_MONGODB=mongodb://mongodb:27017
+        - URL_MONGODB=mongodb://mongodb:27017/
         - BROKER_URL=redis://redis:6379
         - RESULT_BACKEND=redis://redis:6379
       command: uvicorn app:app --reload --host 0.0.0.0 --port 80
@@ -36,7 +36,7 @@ services:
         - redis
 
   celery:
-    build: .
+    build: ""
     environment:
       - BROKER_URL=redis://redis:6379
       - RESULT_BACKEND=redis://redis:6379

@@ -2,9 +2,10 @@ from typing import List
 
 from fastapi import status, Body, HTTPException, APIRouter, Header
 
-from models.buy import BuyOut
-from models.excursion import ExcursionOut, ExcursionIn, ExcursionDetails
+from models.buy import Buy
+from models.excursion import ExcursionOut, ExcursionIn
 from models.other import Error
+from models.user_excurion import UserExcursionOut
 
 router = APIRouter()
 
@@ -23,13 +24,13 @@ async def get_excursions(jwt: str = Header(..., example='key')):
     pass
 
 
-@router.post("/{excursion_id}", status_code=status.HTTP_200_OK, response_model=BuyOut,
+@router.post("/{excursion_id}", status_code=status.HTTP_200_OK, response_model=UserExcursionOut,
              responses={400: {'model': Error}, 401: {'model': Error}})
 async def buy_excursion(excursion_id: int, jwt: str = Header(..., example='key')):
     pass
 
 
-@router.get("/{excursion_id}", status_code=status.HTTP_200_OK, response_model=ExcursionDetails,
+@router.get("/{excursion_id}", status_code=status.HTTP_200_OK, response_model=ExcursionOut,
             responses={400: {'model': Error}, 401: {'model': Error}})
 async def get_excursion_by_id(excursion_id: int, jwt: str = Header(..., example='key')):
     pass

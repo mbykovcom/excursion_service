@@ -8,11 +8,6 @@ class BuyIn(BaseModel):
     id_user: int = Field(..., description='User id')
 
 
-class BuyOut(BuyIn):
-    id: int = Field(..., description='Buy id')
-    date_buy: datetime = Field(..., description='Date of buying')
-
-
 class Buy:
     def __init__(self, _id: int, id_user: int, id_excursion: int, date_buy: datetime):
         self._id: int = _id
