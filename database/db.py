@@ -26,8 +26,6 @@ def add(data: Union[User, Object]) -> Union[User, Object]:
     keys = db.get_collection('table_keys')
     try:
         last_raw = get_last_id(table)
-        if last_raw.last_id == 0:
-            last_raw.last_id += 1
         data._id = last_raw.last_id
         id = collection.insert_one(data.__dict__).inserted_id
         count = keys.update_one({'table': table}, {'$inc': {'last_id': 1}}, upsert=True).modified_count
@@ -35,7 +33,8 @@ def add(data: Union[User, Object]) -> Union[User, Object]:
             return data
         else:
             collection.delete_one({'_id': id})
-            keys.update_one({'table': table}, {'$inc': {'last_id': -1}}, upsert=True)
+            if last_raw.last_id != 1:
+                keys.update_one({'table': table}, {'$inc': {'last_id': -1}}, upsert=True)
             return None
     except BaseException as e:  # If an exception is raised when adding to the database
         print(f'Error: {e}')
@@ -53,6 +52,27 @@ def delete(id: int, collection_name: str) -> bool:
     collection = db.get_collection(collection_name)
     count = collection.delete_one({'_id': id}).deleted_count
     if count:
+        return True
+    else:
+        return False
+
+
+def update_item(update: Union[User, Object]) -> bool:
+    """
+    Updates an object in the collection
+    :param update: Object to update
+    :return: result of updating
+    """
+    db = Database()
+    if type(update) is User:
+        table = 'users'
+    elif type(update) is Object:
+        table = 'objects'
+    else:
+        return False
+    collection = db.get_collection(table)
+    modified = collection.update_one({'_id': update._id}, {'$set': update.__dict__}).modified_count
+    if modified:
         return True
     else:
         return False
@@ -95,9 +115,15 @@ def get_all_items(collection_name: str):
         return None
     return list_items
 
+
 # USERS
 
 def get_user_by_email(email: str) -> User:
+    """
+        Get a user by email
+        :param email: user's email address
+        :return: the desired user
+        """
     db = Database()
     collection = db.get_collection('users')
     user_data = collection.find_one({'email': email})
@@ -108,6 +134,11 @@ def get_user_by_email(email: str) -> User:
 
 
 def activate_user(email: str):
+    """
+       Activates the user in the service
+       :param email: user's email address
+       :return: activation result
+       """
     db = Database()
     users = db.get_collection('users')
     try:
@@ -123,6 +154,10 @@ def activate_user(email: str):
 
 
 def get_inactive(hour: int = None) -> List[User]:
+    """
+        Get a list of users who are inactive within N hours after registration
+        :return: list of inactive users
+        """
     db = Database()
     collection = db.get_collection('users')
     if hour is None:
@@ -139,6 +174,11 @@ def get_inactive(hour: int = None) -> List[User]:
 
 
 def delete_users(list_id: List[int]):
+    """
+              Delete an users from the collection
+              :param list_id: list of user IDs to delete
+              :return: the result of the removal
+              """
     db = Database()
     collection = db.get_collection('users')
     count = collection.delete_many({'_id': {'$in': list_id}}).deleted_count
@@ -151,6 +191,12 @@ def delete_users(list_id: List[int]):
 # TABLE KEYS
 
 def add_key(table: str, last_id: int = 1) -> TableKey:
+    """
+    Create an entry in the table about the last collection id
+    :param table: collection name
+    :param last_id: last id in the collection
+    :return: Data about the collection and its latest id
+    """
     db = Database()
     collection = db.get_collection('table_keys')
     key_id = collection.insert_one({'table': table, 'last_id': last_id}).inserted_id
@@ -158,6 +204,11 @@ def add_key(table: str, last_id: int = 1) -> TableKey:
 
 
 def get_last_id(table: str) -> TableKey:
+    """
+    Get the latest id in the collection
+    :param table: collection name
+    :return: Data about the collection and its latest id
+    """
     db = Database()
     collection = db.get_collection('table_keys')
     key = collection.find_one({'table': table})

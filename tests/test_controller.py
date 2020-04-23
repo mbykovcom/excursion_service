@@ -3,7 +3,7 @@ import unittest
 from datetime import datetime, timedelta
 
 from database.connection import Database
-from models.object import Object, Coordinates
+from models.object import Object, Coordinates, ObjectUpdate
 from models.other import Token
 from utils.auth import get_hash_password
 from controllers import user as user_service
@@ -93,11 +93,26 @@ class TestObject:
 
     def test_get_objects(self):
         obj_copy = copy.deepcopy(self.obj)
-        obj_copy.name = 'Object 2'
+        obj_copy.name = 'Object 3'
         object_service.create_object(obj_copy)
         objects = object_service.get_objects()
         assert len(objects) == 2
         assert objects[1].name == obj_copy.name
+
+    def test_update_object(self):
+        update = ObjectUpdate(name='Update name')
+        result = object_service.update_object(3, update)
+        assert type(result) is Object
+        assert result.name == update.name
+        update.description = 'Update description'
+        update.location = Coordinates(lat=0.0, lon=0.0)
+        result = object_service.update_object(3, update)
+        assert type(result) is Object
+        assert result.name == update.name
+        assert result.description == update.description
+        assert result.location == update.location
+        result = object_service.update_object(10, update)
+        assert result is None
 
 
 if __name__ == '__main__':

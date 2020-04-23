@@ -11,12 +11,18 @@ class ObjectIn(BaseModel):
     location: dict = Field(..., description='The coordinates of the location')
 
 
+class ObjectUpdate(BaseModel):
+    name: str = Field(None, description='The name of the object')
+    description: str = Field(None, description='The description of a object')
+    location: dict = Field(None, description='The coordinates of the location')
+
+
 class ObjectOut(ObjectIn):
     id: int = Field(..., description='Object id')
 
 
 class Object:
-    def __init__(self, name: str, description: str, location: Coordinates,  _id: int = None):
+    def __init__(self, name: str, description: str, location: Coordinates, _id: int = None):
         self._id: int = _id
         self.name: str = name
         self.description: str = description

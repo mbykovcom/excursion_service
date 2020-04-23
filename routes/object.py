@@ -2,7 +2,7 @@ from typing import List
 
 from fastapi import status, Body, HTTPException, APIRouter, Header
 
-from models.object import ObjectOut, ObjectIn, Object
+from models.object import ObjectOut, ObjectIn, Object, ObjectUpdate
 from models.other import Error
 from controllers import object as obj
 from utils import auth
@@ -45,13 +45,19 @@ async def get_object_by_id(object_id: int, jwt: str = Header(..., example='key')
 
 
 @router.put("/{object_id}", status_code=status.HTTP_200_OK, response_model=ObjectOut,
-            responses={400: {'model': Error}, 401: {'model': Error}})
-async def edit_object(object_id: int, object: ObjectIn = Body(..., example={"name": "Name of the point",
-                                                                            "location": {'lat': 59.93904113769531,
-                                                                                         'lon': 30.3157901763916},
-                                                                            "date_receipt": "2020-03-29 14:10:00"}),
+            responses={401: {'model': Error}, 404: {'model': Error}})
+async def edit_object(object_id: int, obj_update: ObjectUpdate = Body(..., example={"name": "New name of the point",
+                                                                                    "description": "New description",
+                                                                                    "location": {
+                                                                                        'lat': 59.93904113769531,
+                                                                                        'lon': 30.3157901763916}}),
                       jwt: str = Header(..., example='key')):
-    pass
+    auth.authentication(jwt, 'admin')
+    update_object = obj.update_object(object_id, obj_update)
+    if update_object:
+        return update_object.object_out()
+    else:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='An object with this id was not found')
 
 
 @router.delete("/{object_id}", status_code=status.HTTP_200_OK, response_model=ObjectOut,

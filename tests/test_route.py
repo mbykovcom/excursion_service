@@ -142,10 +142,28 @@ class TestObject:
         assert response.status_code == 404
         assert response.json() == {'detail': 'An object with this id was not found'}
 
-
     def test_edit_object(self):
-        pass
-
+        json = {'name': 'Name update'}
+        self.obj.name = json['name']
+        response = client.put('/object/1', headers=self.headers, json=json)
+        assert response.status_code == 200
+        assert response.json() == {"id": 1,
+                                   "name": json['name'],
+                                   "description": self.obj.description,
+                                   "location": {'lat': self.obj.location.lat, 'lon': self.obj.location.lon}}
+        json['description'] = 'Update description'
+        json['location'] = {'lat': 0.0, 'lon': 0.0}
+        self.obj.description = json['description']
+        self.obj.location = Coordinates(lat=json['location']['lat'], lon=json['location']['lon'])
+        response = client.put('/object/1', headers=self.headers, json=json)
+        assert response.status_code == 200
+        assert response.json() == {"id": 1,
+                                   "name": json['name'],
+                                   "description": json['description'],
+                                   "location": json['location']}
+        response = client.get('/object/2', headers=self.headers)
+        assert response.status_code == 404
+        assert response.json() == {'detail': 'An object with this id was not found'}
 
     def test_delete_object(self):
         response = client.delete('/object/1', headers=self.headers)

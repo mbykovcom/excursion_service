@@ -1,7 +1,10 @@
 from typing import List
 
+from fastapi import HTTPException
+from starlette import status
+
 from database import db
-from models.object import Object
+from models.object import Object, ObjectUpdate
 
 
 def create_object(object_data: Object) -> Object:
@@ -45,5 +48,23 @@ def get_object_by_id(id: int) -> Object:
     return db.get_data_by_id(id, 'objects')
 
 
-def edit_object(new_object_data: Object):
-    pass
+def update_object(object_id: int, obj_update: ObjectUpdate) -> Object:
+    """
+       Updates an object in the collection
+       :param object_id: Object id to update
+       :param obj_update: update the data object
+       :return: updated object
+       """
+    obj = get_object_by_id(object_id)
+    if not obj:
+        return None
+    if obj_update.name is not None:
+        obj.name = obj_update.name
+    if obj_update.description is not None:
+        obj.description = obj_update.description
+    if obj_update.location is not None:
+        obj.location = obj_update.location
+    if db.update_item(obj):
+        return obj
+    else:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='Failed to update the object')

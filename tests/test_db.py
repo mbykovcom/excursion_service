@@ -1,3 +1,4 @@
+import copy
 import unittest
 from datetime import datetime, timedelta
 
@@ -29,6 +30,14 @@ class TestBase:
         user_2 = User('user_2@email.ru', get_hash_password('Password_1'), 'User')
         db.add(user_2)
         assert db.delete(2, 'users') is True
+
+    def test_update_item(self):
+        update = copy.deepcopy(self.user)
+        update._id = 1
+        update.name = 'Updated name'
+        update.email = 'update@email.ru'
+        result = db.update_item(update)
+        assert result is True
 
     def test_get_data_by_id(self):
         user = db.get_data_by_id(1, 'users')
