@@ -9,7 +9,7 @@ from passlib.context import CryptContext
 from starlette import status
 
 from config import Config
-from database.collections import user as user_collection, user
+from database import db
 from models.user import User
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -70,7 +70,7 @@ def authentication(token: str = Depends(oauth2_scheme), role: str = 'user') -> U
             raise credentials_exception
     except PyJWTError:
         raise credentials_exception
-    user = user_collection.get_user_by_email(email)
+    user = db.get_user_by_email(email)
     if user is None:
         raise credentials_exception
     elif user.role == 'user' != role:
@@ -87,7 +87,7 @@ def get_user_data(token: str = Depends(oauth2_scheme)) -> User:
     except PyJWTError as e:
         print(f"Error: {e}")
         return None
-    db_user = user.get_user_by_email(email)
-    if user is None:
+    db_user = db.get_user_by_email(email)
+    if db_user is None:
         return None
     return db_user

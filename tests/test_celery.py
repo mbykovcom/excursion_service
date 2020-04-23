@@ -1,7 +1,6 @@
 import unittest
 from datetime import datetime, timedelta
 
-from bson import ObjectId
 import mock
 
 import celery_app
@@ -32,7 +31,7 @@ class TestCelery:
     def test_clearing_inactive_users(self):
         user = User('user_1@email.ru', get_hash_password('Password_1'), 'User')
         user.date_registration = datetime.now() - timedelta(hours=25)
-        user_service.insert_db(user)
+        user_service.create_user(user)
         assert celery_app.clearing_inactive_users() is True
 
 

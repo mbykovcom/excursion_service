@@ -8,7 +8,7 @@ Coordinates = namedtuple('Coordinates', ['lat', 'lon'])
 class ObjectIn(BaseModel):
     name: str = Field(..., description='The name of the object')
     description: str = Field(..., description='The description of a object')
-    location: Coordinates = Field(..., description='The coordinates of the location')
+    location: dict = Field(..., description='The coordinates of the location')
 
 
 class ObjectOut(ObjectIn):
@@ -16,8 +16,11 @@ class ObjectOut(ObjectIn):
 
 
 class Object:
-    def __init__(self, _id: int, name: str, description: str, location: Coordinates):
+    def __init__(self, name: str, description: str, location: Coordinates,  _id: int = None):
         self._id: int = _id
         self.name: str = name
         self.description: str = description
         self.location: Coordinates = location
+
+    def object_out(self):
+        return ObjectOut(id=self._id, name=self.name, description=self.description, location=self.location)

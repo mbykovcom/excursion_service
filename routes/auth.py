@@ -26,15 +26,16 @@ async def registration(user_data: UserIn = Body(..., example={"email": "name@ema
                                                                             'letters, as well as numbers and special '
                                                                             'characters')
     hash_password = auth.get_hash_password(user_data.password)
-    db_user = User(email=user_data.email, hash_password=hash_password, name=user_data.name)
-    if user_service.insert_db(db_user):
+    new_user = User(email=user_data.email, hash_password=hash_password, name=user_data.name)
+    new_user = user_service.create_user(new_user)
+    if new_user:
         access_token_expires = timedelta(hours=Config.REGISTRATION_EXPIRE_HOURS)
         access_token = auth.create_access_token(data={"sub": user_data.email}, expires_delta=access_token_expires)
         url = f'{Config.URL_SERVICE}/registration/{access_token}'
         send_email(user_data.email, title='Activate your account',
                    description=f'Click the link: {url} to activate your account. The link is valid for 24 hours')
-        return UserOut(id=db_user._id, email=db_user.email, name=db_user.name, role=db_user.role,
-                       date_registration=db_user.date_registration)
+        return UserOut(id=new_user._id, email=new_user.email, name=new_user.name, role=new_user.role,
+                       date_registration=new_user.date_registration)
     else:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='Registration error')
 

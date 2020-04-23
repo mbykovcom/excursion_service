@@ -16,8 +16,8 @@ class TestUtils:
 
     def setup_class(cls):
         cls.user = {'email': 'user@email.ru', 'password': 'Password_1'}
-        user_service.insert_db(User(email=cls.user['email'], hash_password=get_hash_password(cls.user['password']),
-                                    name='User'))
+        print(user_service.create_user(User(email=cls.user['email'], hash_password=get_hash_password(cls.user['password']),
+                                      name='User')))
         user_service.activate_user(cls.user['email'])
         cls.jwt = None
 

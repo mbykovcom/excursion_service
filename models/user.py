@@ -6,7 +6,7 @@ from pydantic.networks import EmailStr
 
 class UserAuth(BaseModel):
     email: EmailStr = Field(..., description='The email a user')
-    password: str = Field(..., description='The password a user', min_length=4) # TODO: Сделать проверку сложности пароля
+    password: str = Field(..., description='The password a user', min_length=4)
 
 
 class UserIn(UserAuth):
@@ -31,3 +31,7 @@ class User:
         self.role: str = role
         self.is_active: bool = is_active
         self.date_registration = date_registration
+
+    def user_out(self) -> UserOut:
+        return UserOut(id=self._id, email=self.email, name=self.name, role=self.role,
+                       date_registration=self.date_registration)
