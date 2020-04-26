@@ -3,6 +3,7 @@ import unittest
 from datetime import datetime, timedelta
 
 from database.connection import Database
+from models.excursion import Excursion
 from models.other import TableKey
 from utils.auth import get_hash_password
 from database import db
@@ -88,6 +89,30 @@ class TestUser:
 
     def test_delete_users(self):
         assert db.delete_users([2, 3]) is True
+
+
+class TestExcursion:
+    def setup_class(cls):
+        cls.excursion = Excursion(name='Excursion', description='Excursion`s description', price=100.5)
+        db.add(cls.excursion)
+        cls.jwt = None
+
+    def teardown_class(cls):
+        db = Database()
+        excursions = db.get_collection('excursions')
+        keys = db.get_collection('table_keys')
+        excursions.delete_many({})
+        keys.delete_many({})
+
+    def test_get_excursions(self):
+        new_excursions = copy.deepcopy(self.excursion)
+        new_excursions.name = 'Excursion 2'
+        new_excursions.url_map_route = 'url'
+        db.add(new_excursions)
+        excursions = db.get_excursions()
+        assert len(excursions) == 1
+        assert excursions[0].name == new_excursions.name
+        assert excursions[0].url_map_route == new_excursions.url_map_route
 
 
 class TestTableKey:

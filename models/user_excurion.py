@@ -26,11 +26,19 @@ class UserExcursionDetail(BaseModel):
 
 
 class UserExcursion:
-    def __init__(self, _id: int, id_user: int, id_excursion: int, id_last_point: int, is_active: bool,
-                 date_added: datetime):
+    def __init__(self, id_user: int, id_excursion: int, is_active: bool, date_added: datetime = datetime.now(),
+                 id_last_point: int = 0, _id: int = None):
         self._id: int = _id
         self.id_user: int = id_user
         self.id_excursion: int = id_excursion
         self.id_last_point: int = id_last_point
         self.is_active: bool = is_active
         self.date_added: datetime = date_added
+
+    def __repr__(self):
+        return f"UserExcursion: {self._id} | user: {self.id_user} | excursion: {self.id_excursion} | " \
+               f"last point: {self.id_last_point} | is_active: {self.is_active} | date added: {self.date_added}"
+
+    def user_excursion_out(self):
+        return UserExcursionOut(id=self._id, id_user=self.id_user, id_excursion=self.id_excursion,
+                                id_last_point=self.id_last_point, is_active=self.is_active, date_added=self.date_added)
