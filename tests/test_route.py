@@ -367,7 +367,7 @@ class TestTrack:
         assert response.status_code == 400
         assert response.json() == {'detail': 'Invalid file extension'}
 
-    def test_get_excursion_by_id(self):
+    def test_get_track_by_id(self):
         headers = {'jwt': self.jwt['user']}
         response = client.get(f"/track/{self.tracks[0]._id}", headers=headers)
         assert response.status_code == 200
@@ -394,3 +394,52 @@ class TestTrack:
         assert response[1] == {'id': self.tracks[1]._id,
                                'name': self.tracks[1].name,
                                'url': self.tracks[1].url}
+
+    def test_delete_track(self):
+        headers = {'jwt': self.jwt['admin']}
+        response = client.delete(f"/track/{self.tracks[0]._id}", headers=headers)
+        assert response.status_code == 200
+        assert response.json() == {'id': self.tracks[0]._id,
+                                   'name': self.tracks[0].name,
+                                   'url': self.tracks[0].url}
+        response = client.delete(f"/track/{self.tracks[0]._id}", headers=headers)
+        assert response.status_code == 404
+        assert response.json() == {'detail': 'A track with this id was not found'}
+
+    def test_update_track(self):
+        headers = {'jwt': self.jwt['admin']}
+        track_update = {'track_data': ('update.mp3', b'Update 1')}
+        self.tracks[1].name = 'Update 1'
+        response = client.put(f'/track/{self.tracks[1]._id}', headers=headers, files=track_update,
+                               data={'name': self.tracks[1].name})
+        assert response.status_code == 200
+        response = response.json()
+        assert response == {'id': self.tracks[1]._id,
+                            'name': self.tracks[1].name,
+                            'url': response['url']}
+        assert response['url'] != self.tracks[1].url
+
+        self.tracks[1].url = response['url']
+        track_update = {'track_data': ('update.mp3', b'Update 02')}
+        response = client.put(f'/track/{self.tracks[1]._id}', headers=headers, files=track_update)
+        assert response.status_code == 200
+        assert response.json() == {'id': self.tracks[1]._id,
+                                   'name': self.tracks[1].name,
+                                   'url': self.tracks[1].url}
+
+        self.tracks[1].name = 'Update 2'
+        response = client.put(f'/track/{self.tracks[1]._id}', headers=headers, data={'name': self.tracks[1].name})
+        assert response.status_code == 200
+        response = response.json()
+        assert response == {'id': self.tracks[1]._id,
+                            'name': self.tracks[1].name,
+                            'url': response['url']}
+        self.tracks[1].url = response['url']
+
+        response = client.put(f'/track/{self.tracks[1]._id}', headers=headers)
+        assert response.status_code == 400
+        assert response.json() == {'detail': 'Bad request: no data was received for updating'}
+
+        response = client.put('/track/10', headers=headers, files=track_update, data={'name': self.tracks[1].name})
+        assert response.status_code == 404
+        assert response.json() == {'detail': 'A track with this id was not found'}

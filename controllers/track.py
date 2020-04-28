@@ -1,12 +1,12 @@
 from typing import List
 
-from fastapi import HTTPException, UploadFile
+from fastapi import HTTPException
 from starlette import status
 
 import boto3
 
 from database import db
-from models.track import Track, TrackUpdate
+from models.track import Track
 
 from config import Config
 
@@ -23,7 +23,7 @@ def add_track(track_data: bytes, name: str) -> Track:
     if db.get_track_by_name(name):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                             detail='A track with this name already exists')
-    if add_track_in_cloud(track_data, name):
+    if add_track_in_cloud(track_data, f'{name}.mp3'):
         track_id = db.get_last_id('tracks').last_id
         track = db.add(Track(name, f'{URL}/{name}.mp3', track_id))
         track.track = track_data
@@ -41,7 +41,7 @@ def delete_track(id: int) -> Track:
     if track:
         if db.delete(id, 'tracks'):
             client_s3 = create_client_s3()
-            response = client_s3.delete_object(Bucket=Config.BUCKET, Key=track.name)
+            response = client_s3.delete_object(Bucket=Config.BUCKET, Key=f'{track.name}.mp3')
             return track
     return None
 
@@ -64,42 +64,48 @@ def get_track_by_id(id: int) -> Track:
     return db.get_data_by_id(id, 'tracks')
 
 
-def update_object(track_id: int, track_update: TrackUpdate) -> Track:
+def update_track(track_id: int, track_binary: bytes = None, name: str = None) -> Track:
     """
        Updates an track in the collection
        :param track_id: Track id to update
-       :param track_update: update the data track
+       :param track_binary: update the data track
+       :param name: update the name of the track
        :return: updated track
        """
+    if track_binary is None and name is None:
+        return None
     track = get_track_by_id(track_id)
     if not track:
-        return None
-    if track_update.name is not None and track_update.track is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='A track with this id was not found')
+    if name is not None and track_binary is not None:
         if delete_track_form_cloud(track.name):
-            if not add_track_in_cloud(track_update.track, track_update.name):
+            if not add_track_in_cloud(track_binary, name):
                 return None
         else:
             return None
-    flag_update_track = False
-    if track_update.name is not None:
-        if delete_track_form_cloud(track.name):
-            if track_update.track is not None:
-                if add_track_in_cloud(track_update.track, track.name):
-                    track.name = track_update.name
-                    track.url = f'{URL}/{track.name}.mp3'
-                    flag_update_track = True
-                return None
+        track.name = name
+        track.url = f'{URL}/{track.name}.mp3'
+    else:
+        if name is not None:
+            track_binary = get_track_from_cloud(track.name)
+            if delete_track_form_cloud(track.name):
+                if not add_track_in_cloud(track_binary, name):
+                    return None
+                track.name = name
+                track.url = f'{URL}/{track.name}.mp3'
             else:
-                client = create_client_s3()
+                return None
         else:
-            return None
-    if track_update.track is not None:
-        track.track = track_update.track
-
+            if delete_track_form_cloud(track.name):
+                if not add_track_in_cloud(track_binary, track.name):
+                    return None
+            else:
+                return None
+            return track
     if db.update_item(track):
         return track
     else:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='Failed to update the object')
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='Failed to update the track')
 
 
 # S3 functions
@@ -124,10 +130,16 @@ def add_track_in_cloud(track_data: bytes, name: str):
         return False
 
 
+def get_track_from_cloud(name: str) -> bytes:
+    client_s3 = create_client_s3()
+    result = client_s3.get_object(Bucket=Config.BUCKET, Key=name)
+    return result['Body'].read()
+
+
 def delete_track_form_cloud(name: str):
     client_s3 = create_client_s3()
     result = client_s3.delete_object(Bucket=Config.BUCKET, Key=name)
-    if result['ResponseMetadata']['HTTPStatusCode'] == 200:
+    if result['ResponseMetadata']['HTTPStatusCode'] == 204:     # Boto3 bug: always returns 204
         return True
     else:
         return False

@@ -214,6 +214,7 @@ class TestTrack:
     def setup_class(cls):
         cls.tracks = [Track('Track')]
         cls.track_binary = b'track'
+        cls.tracks_in_storage = {'track_data': b'track data', 'name': 'Track Name'}
 
     def teardown_class(cls):
         db = Database()
@@ -222,13 +223,27 @@ class TestTrack:
         tracks.delete_many({})
         keys.delete_many({})
 
+    def test_add_track_in_cloud(self):
+        result = track_service.add_track_in_cloud(self.tracks_in_storage['track_data'],
+                                                  self.tracks_in_storage['name'])
+        assert result is True
+
+    def test_get_track_from_cloud(self):
+        result = track_service.get_track_from_cloud(self.tracks_in_storage['name'])
+        assert type(result) is bytes
+        assert result == self.tracks_in_storage['track_data']
+
+    def test_delete_track_form_cloud(self):
+        result = track_service.delete_track_form_cloud(self.tracks_in_storage['name'])
+        assert result is True
+
     def test_add_track(self):
         self.tracks[0] = track_service.add_track(self.track_binary, self.tracks[0].name)
         assert type(self.tracks[0]) is Track
         assert self.tracks[0]._id == 1
         assert self.tracks[0].name == self.tracks[0].name
         assert self.tracks[0].url is not None
-        with raises(HTTPException) as e:
+        with raises(HTTPException):
             assert track_service.add_track(self.track_binary, self.tracks[0].name)
 
     def test_delete_track(self):
@@ -252,6 +267,32 @@ class TestTrack:
         assert len(tracks) == 2
         assert tracks[0].name == self.tracks[1].name
         assert tracks[0].url == self.tracks[1].url
+
+    def test_update_track(self):
+        result = track_service.update_track(self.tracks[1]._id)
+        assert result is None
+
+        with raises(HTTPException):
+            assert track_service.update_track(10, b'Update', 'Update')
+
+        result = track_service.update_track(self.tracks[1]._id, b'Update', 'Update')
+        assert type(result) is Track
+        assert result.name == 'Update'
+        assert result.url != self.tracks[1].url
+        self.tracks[1].name = result.name
+        self.tracks[1].url = result.url
+
+        result = track_service.update_track(self.tracks[1]._id, b'Update 2')
+        assert type(result) is Track
+        assert result.name == self.tracks[1].name
+        assert result.url == self.tracks[1].url
+
+        result = track_service.update_track(self.tracks[1]._id, name='Update 2')
+        assert type(result) is Track
+        assert result.name == 'Update 2'
+        assert result.url != self.tracks[1].url
+        self.tracks[1].name = result.name
+        self.tracks[1].url = result.url
 
 
 if __name__ == '__main__':
