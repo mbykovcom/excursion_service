@@ -2,19 +2,21 @@ import copy
 import unittest
 from datetime import datetime, timedelta
 
-from database.connection import Database
+from fastapi import HTTPException
+from pytest import raises
 
+from database.connection import Database
+from models.track import Track
 from models.user import User, UserAuth
 from models.object import Object, Coordinates, ObjectUpdate
 from models.excursion import Excursion, ExcursionUpdate
-from models.excursion_point import ExcursionPoint
 from models.other import Token
-from models.user_excurion import UserExcursion
 
 from utils.auth import get_hash_password
 from controllers import user as user_service
 from controllers import object as object_service
 from controllers import excursion as excursion_service
+from controllers import track as track_service
 
 
 class TestUser:
@@ -206,6 +208,51 @@ class TestExcursion:
 
         user_excursion = excursion_service.buy_excursion(10, self.user._id)
         assert user_excursion is None
+
+
+class TestTrack:
+    def setup_class(cls):
+        cls.tracks = [Track('Track')]
+        cls.track_binary = b'track'
+
+    def teardown_class(cls):
+        db = Database()
+        tracks = db.get_collection('tracks')
+        keys = db.get_collection('table_keys')
+        tracks.delete_many({})
+        keys.delete_many({})
+
+    def test_add_track(self):
+        self.tracks[0] = track_service.add_track(self.track_binary, self.tracks[0].name)
+        assert type(self.tracks[0]) is Track
+        assert self.tracks[0]._id == 1
+        assert self.tracks[0].name == self.tracks[0].name
+        assert self.tracks[0].url is not None
+        with raises(HTTPException) as e:
+            assert track_service.add_track(self.track_binary, self.tracks[0].name)
+
+    def test_delete_track(self):
+        track = track_service.delete_track(self.tracks[0]._id)
+        assert track.name == self.tracks[0].name
+        track = track_service.delete_track(10)
+        assert track is None
+
+    def test_get_track_by_id(self):
+        self.tracks.append(Track('Track 2'))
+        self.tracks[1] = track_service.add_track(self.track_binary, self.tracks[1].name)
+        track = track_service.get_track_by_id(self.tracks[1]._id)
+        assert track.name == self.tracks[1].name
+        track = track_service.delete_track(10)
+        assert track is None
+
+    def test_get_tracks(self):
+        self.tracks.append(Track('Track 3'))
+        self.tracks[2] = track_service.add_track(self.track_binary, self.tracks[2].name)
+        tracks = track_service.get_tracks()
+        assert len(tracks) == 2
+        assert tracks[0].name == self.tracks[1].name
+        assert tracks[0].url == self.tracks[1].url
+
 
 if __name__ == '__main__':
     unittest.main()

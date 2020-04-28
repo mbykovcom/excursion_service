@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from database.connection import Database
 from models.excursion import Excursion
 from models.other import TableKey
+from models.track import Track
 from utils.auth import get_hash_password
 from database import db
 from models.user import User
@@ -113,6 +114,26 @@ class TestExcursion:
         assert len(excursions) == 1
         assert excursions[0].name == new_excursions.name
         assert excursions[0].url_map_route == new_excursions.url_map_route
+
+
+class TestTrack:
+    def setup_class(cls):
+        cls.track = Track(1, 'Track')
+        db.add(cls.track)
+        cls.jwt = None
+
+    def teardown_class(cls):
+        db = Database()
+        tracks = db.get_collection('tracks')
+        keys = db.get_collection('table_keys')
+        tracks.delete_many({})
+        keys.delete_many({})
+
+    def test_get_track_by_name(self):
+        track = db.get_track_by_name(self.track.name)
+        assert type(track) is Track
+        assert track.name == self.track.name
+
 
 
 class TestTableKey:

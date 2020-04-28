@@ -32,6 +32,11 @@ class User:
         self.is_active: bool = is_active
         self.date_registration = date_registration
 
+    def __repr__(self):
+        return f"User: {self._id} | email: {self.email} | hash_password: {self.hash_password} | " \
+               f"name: {self.name} | role: {self.role} | is active: {self.is_active} | " \
+               f"date registration: {self.date_registration}"
+
     def user_out(self) -> UserOut:
         return UserOut(id=self._id, email=self.email, name=self.name, role=self.role,
                        date_registration=self.date_registration)

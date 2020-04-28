@@ -28,5 +28,9 @@ class Object:
         self.description: str = description
         self.location: Coordinates = location
 
+    def __repr__(self):
+        return f"Object: {self._id} | name: {self.name} | description: {self.description} | " \
+               f"location: lat={self.location.lat} lon={self.location.lon}"
+
     def object_out(self):
         return ObjectOut(id=self._id, name=self.name, description=self.description, location=self.location)

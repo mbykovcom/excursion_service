@@ -5,14 +5,15 @@ from database.connection import Database
 from models.excursion import Excursion
 from models.object import Object
 from models.other import TableKey
+from models.track import Track
 from models.user import User
-
 
 # BASE
 from models.user_excurion import UserExcursion
 
 
-def add(data: Union[User, Object, Excursion, UserExcursion]) -> Union[User, Object, Excursion, UserExcursion]:
+def add(data: Union[User, Object, Excursion, UserExcursion, Track]) -> Union[User, Object, Excursion, UserExcursion,
+                                                                             Track]:
     """
     Adds an object to the collection
     :param data: object to add to the collection
@@ -27,6 +28,8 @@ def add(data: Union[User, Object, Excursion, UserExcursion]) -> Union[User, Obje
         table = 'excursions'
     elif type(data) is UserExcursion:
         table = 'user_excursions'
+    elif type(data) is Track:
+        table = 'tracks'
     else:
         return False
     collection = db.get_collection(table)
@@ -64,7 +67,7 @@ def delete(id: int, collection_name: str) -> bool:
         return False
 
 
-def update_item(update: Union[User, Object, Excursion]) -> bool:
+def update_item(update: Union[User, Object, Excursion, Track]) -> bool:
     """
     Updates an object in the collection
     :param update: Object to update
@@ -77,6 +80,8 @@ def update_item(update: Union[User, Object, Excursion]) -> bool:
         table = 'objects'
     elif type(update) is Excursion:
         table = 'excursions'
+    elif type(update) is Track:
+        table = 'tracks'
     else:
         return False
     try:
@@ -91,7 +96,7 @@ def update_item(update: Union[User, Object, Excursion]) -> bool:
         return False
 
 
-def get_data_by_id(id: int, collection_name: str) -> Union[User, Object, Excursion]:
+def get_data_by_id(id: int, collection_name: str) -> Union[User, Object, Excursion, Track]:
     """
     Get an item from the collection by id
     :param id: id of the item you are looking for
@@ -108,15 +113,18 @@ def get_data_by_id(id: int, collection_name: str) -> Union[User, Object, Excursi
             data = Object(**data)
         elif collection_name == 'excursions':
             data = Excursion(**data)
+        elif collection_name == 'tracks':
+            data = Track(**data)
         else:
             return None
     return data
 
 
-def get_all_items(collection_name: str):
+def get_all_items(collection_name: str) -> Union[List[User], List[Object], List[Excursion], List[UserExcursion],
+                                                 List[Track]]:
     """
     Get all objects from the collection
-    :param collection_name: сollection name
+    :param collection_name: collection name
     :return: list of items
     """
     db = Database()
@@ -128,6 +136,8 @@ def get_all_items(collection_name: str):
         list_items = [Object(**obj_data) for obj_data in data]
     elif collection_name == 'excursions':
         list_items = [Excursion(**excursion_data) for excursion_data in data]
+    elif collection_name == 'tracks':
+        list_items = [Track(**track_data) for track_data in data]
     else:
         return None
     return list_items
@@ -215,6 +225,23 @@ def get_excursions():
     return list_excursions
 
 
+# TRACK
+
+def get_track_by_name(name: str) -> Track:
+    """
+    Get a track by name
+    :param name: track name
+    :return: the desired track
+    """
+    db = Database()
+    collection = db.get_collection('tracks')
+    track_data = collection.find_one({'name': name})
+    if track_data:
+        return Track(**track_data)
+    else:
+        return None
+
+
 # TABLE KEYS
 
 def add_key(table: str, last_id: int = 1) -> TableKey:
@@ -242,5 +269,3 @@ def get_last_id(table: str) -> TableKey:
     if key is None:
         return add_key(table)
     return TableKey(**key)
-
-

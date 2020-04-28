@@ -18,6 +18,12 @@ class Config(object):
     ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin')
     URL_SERVICE = os.environ.get('URL_SERVICE', 'http://0.0.0.0')
 
+    S3_END_POINT = os.environ.get('S3_END_POINT', 'https://excursion.fra1.digitaloceanspaces.com')
+    REGION = os.environ.get('REGION', 'fra1')
+    S3_ACCESS_KEY = os.environ.get('S3_ACCESS_KEY', 'V5L5K6H7M4H6B5GUD34A')
+    S3_SECRET_ACCESS_KEY = os.environ.get('S3_SECRET_ACCESS_KEY', 'E0IfzUunahTvdQYx1epEE9wSf0Al0wKYhqfOLOHOoXU')
+    BUCKET = os.environ.get('BUCKET', 'Track')
+
 
 class ConfigCelery:
     broker_url = os.environ.get('BROKER_URL', 'redis://localhost:6379')

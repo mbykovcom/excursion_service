@@ -9,6 +9,7 @@ from controllers.user import login, create_user
 from database.connection import Database
 from models.excursion import Excursion
 from models.object import Object, Coordinates
+from models.track import Track
 from models.user import User, UserAuth
 from utils import auth
 from utils.auth import get_hash_password
@@ -320,3 +321,76 @@ class TestExcursion:
         response = client.delete(f"/excursion/{self.excursions[0]._id}", headers=headers)
         assert response.status_code == 404
         assert response.json() == {'detail': 'An excursion with this id was not found'}
+
+
+class TestTrack:
+
+    def setup_class(cls):
+        cls.admin = User(email='admin@email.ru', hash_password=get_hash_password('AdminPassword_1'), name='Admin',
+                         role='admin',
+                         is_active=True)
+        create_user(cls.admin)
+        cls.user = User(email='user@email.ru', hash_password=get_hash_password('UserPassword_1'), name='User',
+                        is_active=True)
+        create_user(cls.user)
+
+        cls.jwt = {'admin': login(UserAuth(email=cls.admin.email, password='AdminPassword_1')).access_token,
+                   'user': login(UserAuth(email=cls.user.email, password='UserPassword_1')).access_token}
+
+        cls.tracks = [Track('Track')]
+        cls.track_binary = b'track'
+
+    def teardown_class(cls):
+        db = Database()
+        users = db.get_collection('users')
+        tracks = db.get_collection('tracks')
+        user_excursions = db.get_collection('user_excursions')
+        keys = db.get_collection('table_keys')
+        users.delete_many({})
+        tracks.delete_many({})
+        user_excursions.delete_many({})
+        keys.delete_many({})
+
+    def test_add_track_storage(self):
+        headers = {'jwt': self.jwt['admin']}
+        track_upload = {'track_data': ('track.mp3', self.track_binary)}
+        response = client.post('/track', headers=headers, files=track_upload, data={'name': self.tracks[0].name})
+        assert response.status_code == 201
+        response = response.json()
+        assert response == {'id': 1,
+                            'name': self.tracks[0].name,
+                            'url': response['url']}
+        self.tracks[0]._id = response['id']
+        self.tracks[0].url = response['url']
+        track_upload = {'track_data': ('track.mp4', self.track_binary)}
+        response = client.post('/track', headers=headers, files=track_upload, data={'name': self.tracks[0].name})
+        assert response.status_code == 400
+        assert response.json() == {'detail': 'Invalid file extension'}
+
+    def test_get_excursion_by_id(self):
+        headers = {'jwt': self.jwt['user']}
+        response = client.get(f"/track/{self.tracks[0]._id}", headers=headers)
+        assert response.status_code == 200
+        assert response.json() == {'id': self.tracks[0]._id,
+                                   'name': self.tracks[0].name,
+                                   'url': self.tracks[0].url}
+        response = client.get(f"/track/10", headers=headers)
+        assert response.status_code == 404
+        assert response.json() == {'detail': 'A track with this id was not found'}
+
+    def test_get_tracks(self):
+        headers = {'jwt': self.jwt['admin']}
+        track_upload = {'track_data': ('track.mp3', self.track_binary)}
+        self.tracks.append(Track('Track 2'))
+        response = client.post('/track', headers=headers, files=track_upload, data={'name': self.tracks[1].name})
+        assert response.status_code == 201
+        response = response.json()
+        self.tracks[1]._id = response['id']
+        self.tracks[1].url = response['url']
+        response = client.get("/track", headers=headers)
+        assert response.status_code == 200
+        response = response.json()
+        assert len(response) == 2
+        assert response[1] == {'id': self.tracks[1]._id,
+                               'name': self.tracks[1].name,
+                               'url': self.tracks[1].url}
