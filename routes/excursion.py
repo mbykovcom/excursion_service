@@ -2,11 +2,12 @@ from typing import List
 
 from fastapi import status, Body, HTTPException, APIRouter, Header
 
-from models.buy import Buy
 from models.excursion import ExcursionOut, ExcursionIn, Excursion, ExcursionUpdate
+from models.excursion_point import ExcursionPointOut, ExcursionPointIn, ExcursionPoint, ExcursionPointUpdate
 from models.other import Error
 from models.user_excurion import UserExcursionOut
 from controllers import excursion as excursion_service
+from controllers import excursion_point as point_service
 from utils import auth
 
 router = APIRouter()
@@ -75,3 +76,89 @@ async def delete_excursion_by_id(excursion_id: int, jwt: str = Header(..., examp
     if not excursion:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='An excursion with this id was not found')
     return excursion.excursion_out()
+
+
+# EXCURSION POINT
+
+
+@router.post("/{excursion_id}/point", status_code=status.HTTP_201_CREATED, response_model=ExcursionPointOut,
+             responses={401: {'model': Error}})
+async def create_excursion_point(excursion_id: int, point_data: ExcursionPointIn = Body(...,
+                                                                                        example={"id_excursion": 1,
+                                                                                                 "id_object": 1,
+                                                                                                 "id_track": 1,
+                                                                                                 "sequence_number": 1}),
+                                 jwt: str = Header(..., example='key')):
+    auth.authentication(jwt, 'admin')
+    excursion = excursion_service.get_excursion_by_id(excursion_id)
+    if not excursion:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='An excursion with this id was not found')
+    new_point = ExcursionPoint(**point_data.dict())
+    point = point_service.create_excursion_point(new_point)
+    if not point:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='The excursion point was not '
+                                                                                      'created, an error occurred '
+                                                                                      'when creating the point')
+    excursion_service.update_url_map_route(excursion_id)
+    return point.excursion_point_out()
+
+
+@router.get("/{excursion_id}/point", status_code=status.HTTP_200_OK, response_model=List[ExcursionPointOut],
+            responses={401: {'model': Error}})
+async def get_excursion_points(excursion_id: int, jwt: str = Header(..., example='key')):
+    auth.authentication(jwt)
+    excursion = excursion_service.get_excursion_by_id(excursion_id)
+    if not excursion:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='An excursion with this id was not found')
+    points = point_service.get_excursion_points_by_excursion(excursion_id)
+    if len(points) == 0:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='An excursion with this id has no excursion '
+                                                                          'point')
+
+    return [point.excursion_point_out() for point in points]
+
+
+@router.get("/{excursion_id}/point/{point_id}", status_code=status.HTTP_200_OK, response_model=ExcursionPointOut,
+            responses={401: {'model': Error}, 404: {'model': Error}})
+async def get_excursion_point_by_id(excursion_id: int, point_id: int, jwt: str = Header(..., example='key')):
+    auth.authentication(jwt, 'admin')
+    excursion = excursion_service.get_excursion_by_id(excursion_id)
+    if not excursion:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='An excursion with this id was not found')
+    point = point_service.get_excursion_point_by_id(point_id)
+    if not point:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='An excursion point with this id was not '
+                                                                          'found')
+    return point.excursion_point_out()
+
+
+@router.put("/{excursion_id}/point/{point_id}", status_code=status.HTTP_200_OK, response_model=ExcursionPointOut,
+            responses={400: {'model': Error}, 401: {'model': Error}})
+async def edit_excursion_point(excursion_id: int, point_id: int,
+                               point_update: ExcursionPointUpdate = Body(..., example={"id_object": 1,
+                                                                                       "id_track": 1}),
+                               jwt: str = Header(..., example='key')):
+    auth.authentication(jwt, 'admin')
+    update_point = point_service.update_excursion_point(point_id, point_update.id_object, point_update.id_track)
+    if not update_point:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='An excursion with this id was not found')
+    excursion = excursion_service.get_excursion_by_id(excursion_id)
+    if point_update.id_object:
+        excursion_service.update_url_map_route(excursion_id)
+    return update_point.excursion_point_out()
+
+
+@router.delete("/{excursion_id}/point/{point_id}", status_code=status.HTTP_200_OK, response_model=ExcursionPointOut,
+               responses={401: {'model': Error}, 404: {'model': Error}})
+async def delete_excursion_point_by_id(excursion_id: int, point_id: int, jwt: str = Header(..., example='key')):
+    auth.authentication(jwt, 'admin')
+    excursion = excursion_service.get_excursion_by_id(excursion_id)
+    if not excursion:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='An excursion with this id was not found')
+    point = point_service.get_excursion_point_by_id(point_id)
+    if not point:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='An excursion point with this id was not '
+                                                                          'found')
+    point = point_service.delete_excursion_point(point_id)
+    excursion_service.update_url_map_route(excursion_id)
+    return point.excursion_point_out()

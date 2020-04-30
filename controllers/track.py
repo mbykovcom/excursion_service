@@ -23,7 +23,7 @@ def add_track(track_data: bytes, name: str) -> Track:
     if db.get_track_by_name(name):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                             detail='A track with this name already exists')
-    if add_track_in_cloud(track_data, f'{name}.mp3'):
+    if add_track_in_cloud(track_data, name):
         track_id = db.get_last_id('tracks').last_id
         track = db.add(Track(name, f'{URL}/{name}.mp3', track_id))
         track.track = track_data
@@ -123,7 +123,7 @@ def create_client_s3():
 
 def add_track_in_cloud(track_data: bytes, name: str):
     client_s3 = create_client_s3()
-    result = client_s3.put_object(Bucket=Config.BUCKET, Key=name, Body=track_data)
+    result = client_s3.put_object(Bucket=Config.BUCKET, Key=f'{name}.mp3', Body=track_data)
     if result['ResponseMetadata']['HTTPStatusCode'] == 200:
         return True
     else:
@@ -132,7 +132,7 @@ def add_track_in_cloud(track_data: bytes, name: str):
 
 def get_track_from_cloud(name: str) -> bytes:
     client_s3 = create_client_s3()
-    result = client_s3.get_object(Bucket=Config.BUCKET, Key=name)
+    result = client_s3.get_object(Bucket=Config.BUCKET, Key=f'{name}.mp3')
     return result['Body'].read()
 
 

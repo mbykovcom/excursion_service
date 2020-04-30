@@ -1,8 +1,10 @@
-from typing import List
+import re
 
 from pydantic import BaseModel, Field
 
-from models.excursion_point import ExcursionPoint
+from config import Config
+from controllers import excursion_point as point_service
+from controllers import object as object_service
 
 
 class ExcursionIn(BaseModel):
@@ -37,5 +39,23 @@ class Excursion:
         return ExcursionOut(id=self._id, name=self.name, description=self.description, price=self.price,
                             url_map_route=self.url_map_route)
 
-    def create_url_map_route(self, list_point: List[ExcursionPoint]):
-        pass
+    def create_url_map_route(self):
+        points = point_service.get_excursion_points_by_excursion(self._id)
+        if not points:
+            self.url_map_route = None
+            return self.url_map_route
+        avg_lat, avg_lon = 0.0, 0.0
+        map_points = ''
+        list_id = [point.id_object for point in points]
+        list_objects = object_service.get_objects_by_list_id(list_id)
+        for obj, point in zip(list_objects, points):
+            lat = obj.location[0]
+            lon = obj.location[1]
+            map_points += f'{lon},{lat},pmwtm{point.sequence_number}~'
+            avg_lat += float(lat)
+            avg_lon += float(lon)
+        avg_lon = avg_lon/len(points)
+        avg_lat = avg_lat/len(points)
+        self.url_map_route = f'{Config.MAP}ll={avg_lon},{avg_lat}&z={Config.ZOOM_MAP}&l={Config.TYPE_MAP}' \
+                             f'&pt={map_points[:-1]}'   # -1 to remove the unnecessary one at the end ~
+        return self.url_map_route

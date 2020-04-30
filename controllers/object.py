@@ -68,3 +68,7 @@ def update_object(object_id: int, obj_update: ObjectUpdate) -> Object:
         return obj
     else:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='Failed to update the object')
+
+
+def get_objects_by_list_id(list_id: List[int]) -> List[Object]: # TODO Testing
+    return db.get_items_by_list_id('objects', list_id)

@@ -6,6 +6,7 @@ from fastapi import HTTPException
 from pytest import raises
 
 from database.connection import Database
+from models.excursion_point import ExcursionPoint, ExcursionPointUpdate
 from models.track import Track
 from models.user import User, UserAuth
 from models.object import Object, Coordinates, ObjectUpdate
@@ -16,6 +17,7 @@ from utils.auth import get_hash_password
 from controllers import user as user_service
 from controllers import object as object_service
 from controllers import excursion as excursion_service
+from controllers import excursion_point as point_service
 from controllers import track as track_service
 
 
@@ -132,10 +134,12 @@ class TestExcursion:
     def teardown_class(cls):
         db = Database()
         excursions = db.get_collection('excursions')
+        points = db.get_collection('excursion_points')
         user_excursions = db.get_collection('user_excursions')
         users = db.get_collection('users')
         keys = db.get_collection('table_keys')
         excursions.delete_many({})
+        points.delete_many({})
         user_excursions.delete_many({})
         keys.delete_many({})
         users.delete_many({})
@@ -151,8 +155,16 @@ class TestExcursion:
         self.excursions[0]._id = excursion._id
 
     def test_delete_excursion(self):
+        points = [ExcursionPoint(1, 1, 1, 1, 1), ExcursionPoint(1, 2, 2, 2, 2), ExcursionPoint(1, 3, 3, 3, 3)]
+        point = point_service.create_excursion_point(points[0])
+        point_service.create_excursion_point(points[1])
+        point_service.create_excursion_point(points[2])
         excursion = excursion_service.delete_excursion(1)
         assert excursion.name == self.excursions[0].name
+        points = point_service.get_excursion_points_by_excursion(1)
+        assert len(points) == 0
+        excursion = excursion_service.delete_excursion(10)
+        assert excursion is None
 
     def test_get_excursion_by_id(self):
         self.excursions.append(Excursion(name='Excursion 2', description='Description 2', price=200.5))
@@ -199,7 +211,6 @@ class TestExcursion:
 
     def test_buy_excursion(self):
         user_excursion = excursion_service.buy_excursion(self.excursions[2]._id, self.user._id)
-        print(user_excursion)
         assert user_excursion._id == 1
         assert user_excursion.id_user == self.user._id
         assert user_excursion.id_excursion == self.excursions[2]._id
@@ -211,6 +222,7 @@ class TestExcursion:
 
 
 class TestTrack:
+
     def setup_class(cls):
         cls.tracks = [Track('Track')]
         cls.track_binary = b'track'
@@ -293,6 +305,89 @@ class TestTrack:
         assert result.url != self.tracks[1].url
         self.tracks[1].name = result.name
         self.tracks[1].url = result.url
+
+
+class TestExcursionPoints:
+
+    def setup_class(cls):
+        cls.points = [ExcursionPoint(1, 1, 1, 1)]
+        cls.excursion = Excursion(name='Excursion', description='Excursion`s description', price=100.5)
+        cls.obj = Object(name='Object', description='Object`s description', location=Coordinates(lat=59.9390,
+                                                                                                 lon=30.3157))
+
+    def teardown_class(cls):
+        db = Database()
+        points = db.get_collection('excursion_points')
+        excursions = db.get_collection('excursions')
+        objects = db.get_collection('objects')
+        keys = db.get_collection('table_keys')
+        points.delete_many({})
+        excursions.delete_many({})
+        objects.delete_many({})
+        keys.delete_many({})
+
+    def test_create_excursion_point(self):
+        with raises(HTTPException) as e:
+            assert point_service.create_excursion_point(ExcursionPoint(1, 2, 2, 2, 2))
+        point = point_service.create_excursion_point(self.points[0])
+        assert type(point) is ExcursionPoint
+        assert point.id_excursion == self.points[0].id_excursion
+        self.points[0]._id = point._id
+        with raises(HTTPException) as e:
+            assert point_service.create_excursion_point(self.points[0])
+        with raises(HTTPException) as e:
+            assert point_service.create_excursion_point(ExcursionPoint(1, 2, 2, 5, 3))
+
+    def test_get_excursion_point_by_id(self):
+        point = point_service.get_excursion_point_by_id(self.points[0]._id)
+        assert type(point) is ExcursionPoint
+        assert point._id == self.points[0]._id
+
+    def test_get_excursion_points(self):
+        self.points.append(ExcursionPoint(1, 2, 2, 2))
+        self.points.append(ExcursionPoint(1, 3, 3, 3))
+        self.points[1]._id = point_service.create_excursion_point(self.points[1])._id
+        self.points[2]._id = point_service.create_excursion_point(self.points[2])._id
+        points = point_service.get_excursion_points()
+        assert len(points) == 3
+
+    def test_get_excursion_points_by_excursion(self):
+        points = point_service.get_excursion_points_by_excursion(self.points[0].id_excursion)
+        assert len(points) == 3
+
+    def test_update_excursion_point(self):
+        point = point_service.update_excursion_point(self.points[2]._id)
+        assert point.id_object == self.points[2].id_object
+        assert point.id_track == self.points[2].id_track
+        point = point_service.update_excursion_point(self.points[2]._id, 4)
+        assert point.id_object == 4
+        assert point.id_track == self.points[2].id_track
+        point = point_service.update_excursion_point(self.points[2]._id, id_track=4)
+        assert point.id_object == 4
+        assert point.id_track == 4
+        point = point_service.update_excursion_point(self.points[2]._id, 3, 3)
+        assert point.id_object == self.points[2].id_object
+        assert point.id_track == self.points[2].id_track
+
+    def test_create_url_map_route(self):
+        excursion = excursion_service.create_excursion(self.excursion)
+        assert type(excursion) is Excursion
+
+        obj_1 = object_service.create_object(self.obj)
+        obj_2 = copy.deepcopy(self.obj)
+        obj_2.location = Coordinates(lat=59.937, lon=30.3187)
+        object_service.create_object(obj_2)
+        obj_3 = copy.deepcopy(self.obj)
+        obj_3.location = Coordinates(lat=59.938, lon=30.3167)
+        object_service.create_object(obj_3)
+        excursion.create_url_map_route()
+        assert excursion.url_map_route is not None
+
+    def test_delete_excursion_point(self):
+        point = point_service.delete_excursion_point(self.points[2]._id)
+        assert point._id == self.points[2]._id
+        point = point_service.delete_excursion_point(10)
+        assert point is None
 
 
 if __name__ == '__main__':

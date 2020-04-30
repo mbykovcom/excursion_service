@@ -3,6 +3,7 @@ from typing import List, Union
 
 from database.connection import Database
 from models.excursion import Excursion
+from models.excursion_point import ExcursionPoint
 from models.object import Object
 from models.other import TableKey
 from models.track import Track
@@ -12,8 +13,9 @@ from models.user import User
 from models.user_excurion import UserExcursion
 
 
-def add(data: Union[User, Object, Excursion, UserExcursion, Track]) -> Union[User, Object, Excursion, UserExcursion,
-                                                                             Track]:
+def add(data: Union[User, Object, Excursion, UserExcursion, Track, ExcursionPoint]) -> Union[User, Object,
+                                                                                             Excursion, UserExcursion,
+                                                                                             Track, ExcursionPoint]:
     """
     Adds an object to the collection
     :param data: object to add to the collection
@@ -30,6 +32,8 @@ def add(data: Union[User, Object, Excursion, UserExcursion, Track]) -> Union[Use
         table = 'user_excursions'
     elif type(data) is Track:
         table = 'tracks'
+    elif type(data) is ExcursionPoint:
+        table = 'excursion_points'
     else:
         return False
     collection = db.get_collection(table)
@@ -67,7 +71,17 @@ def delete(id: int, collection_name: str) -> bool:
         return False
 
 
-def update_item(update: Union[User, Object, Excursion, Track]) -> bool:
+def delete_items_by_list_id(list_id: List[int], collection_name: str) -> bool:
+    db = Database()
+    collection = db.get_collection(collection_name)
+    count = collection.delete_many({'_id': {'$in': list_id}}).deleted_count
+    if count == len(list_id):
+        return True
+    else:
+        return False
+
+
+def update_item(update: Union[User, Object, Excursion, Track, ExcursionPoint]) -> bool:
     """
     Updates an object in the collection
     :param update: Object to update
@@ -82,6 +96,8 @@ def update_item(update: Union[User, Object, Excursion, Track]) -> bool:
         table = 'excursions'
     elif type(update) is Track:
         table = 'tracks'
+    elif type(update) is ExcursionPoint:
+        table = 'excursion_points'
     else:
         return False
     try:
@@ -96,7 +112,7 @@ def update_item(update: Union[User, Object, Excursion, Track]) -> bool:
         return False
 
 
-def get_data_by_id(id: int, collection_name: str) -> Union[User, Object, Excursion, Track]:
+def get_data_by_id(id: int, collection_name: str) -> Union[User, Object, Excursion, Track, ExcursionPoint]:
     """
     Get an item from the collection by id
     :param id: id of the item you are looking for
@@ -115,13 +131,15 @@ def get_data_by_id(id: int, collection_name: str) -> Union[User, Object, Excursi
             data = Excursion(**data)
         elif collection_name == 'tracks':
             data = Track(**data)
+        elif collection_name == 'excursion_points':
+            data = ExcursionPoint(**data)
         else:
             return None
     return data
 
 
 def get_all_items(collection_name: str) -> Union[List[User], List[Object], List[Excursion], List[UserExcursion],
-                                                 List[Track]]:
+                                                 List[Track], List[ExcursionPoint]]:
     """
     Get all objects from the collection
     :param collection_name: collection name
@@ -138,6 +156,29 @@ def get_all_items(collection_name: str) -> Union[List[User], List[Object], List[
         list_items = [Excursion(**excursion_data) for excursion_data in data]
     elif collection_name == 'tracks':
         list_items = [Track(**track_data) for track_data in data]
+    elif collection_name == 'excursion_points':
+        list_items = [ExcursionPoint(**point_data) for point_data in data]
+    else:
+        return None
+    return list_items
+
+
+def get_items_by_list_id(collection_name: str, list_id: List[int]) -> Union[List[User], List[Object], List[Excursion],
+                                                                            List[UserExcursion], List[Track],
+                                                                            List[ExcursionPoint]]:
+    db = Database()
+    collection = db.get_collection(collection_name)
+    data = collection.find({'_id': {'$in': list_id}})
+    if collection_name == 'users':
+        list_items = [User(**user_data) for user_data in data]
+    elif collection_name == 'objects':
+        list_items = [Object(**obj_data) for obj_data in data]
+    elif collection_name == 'excursions':
+        list_items = [Excursion(**excursion_data) for excursion_data in data]
+    elif collection_name == 'tracks':
+        list_items = [Track(**track_data) for track_data in data]
+    elif collection_name == 'excursion_points':
+        list_items = [ExcursionPoint(**point_data) for point_data in data]
     else:
         return None
     return list_items
@@ -200,29 +241,44 @@ def get_inactive(hour: int = None) -> List[User]:
         return None
 
 
-def delete_users(list_id: List[int]):
-    """
-              Delete an users from the collection
-              :param list_id: list of user IDs to delete
-              :return: the result of the removal
-              """
-    db = Database()
-    collection = db.get_collection('users')
-    count = collection.delete_many({'_id': {'$in': list_id}}).deleted_count
-    if count:
-        return True
-    else:
-        return False
-
-
 # EXCURSIONS
 
-def get_excursions():
+def get_excursions() -> List[Excursion]:
     db = Database()
     collection = db.get_collection('excursions')
     data = collection.find({'url_map_route': {'$ne': None}})
     list_excursions = [Excursion(**excursion_data) for excursion_data in data]
     return list_excursions
+
+
+# EXCURSION POINTS
+
+def get_points(excursion_id: int) -> List[ExcursionPoint]:
+    db = Database()
+    collection = db.get_collection('excursion_points')
+    data = collection.find({'id_excursion': excursion_id})
+    list_points = [ExcursionPoint(**point_data) for point_data in data]
+    return list_points
+
+
+def update_url(excursion: Excursion) -> bool:
+    """
+    Updates an url the excursion in the collection
+    :param excursion: Excursion to update
+    :return: result of updating
+    """
+    db = Database()
+    try:
+        collection = db.get_collection('excursions')
+        modified = collection.update_one({'_id': excursion._id},
+                                         {'$set': {'url_map_route': excursion.url_map_route}}).modified_count
+    except BaseException as e:  # If an exception is raised when adding to the database
+        print(f'Error: {e}')
+        return None
+    if modified:
+        return True
+    else:
+        return False
 
 
 # TRACK

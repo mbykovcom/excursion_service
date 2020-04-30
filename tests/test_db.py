@@ -4,6 +4,8 @@ from datetime import datetime, timedelta
 
 from database.connection import Database
 from models.excursion import Excursion
+from models.excursion_point import ExcursionPoint
+from models.object import Object, Coordinates
 from models.other import TableKey
 from models.track import Track
 from utils.auth import get_hash_password
@@ -20,8 +22,10 @@ class TestBase:
     def teardown_class(cls):
         db = Database()
         users = db.get_collection('users')
+        objects = db.get_collection('objects')
         keys = db.get_collection('table_keys')
         users.delete_many({})
+        objects.delete_many({})
         keys.delete_many({})
 
     def test_add(self):
@@ -51,6 +55,19 @@ class TestBase:
         assert type(users) is list
         assert len(users) == 1
         assert type(users[0]) is User
+
+    def test_get_items_by_list(self):
+        objects_in_db = [Object('Object 1', 'Description 1', Coordinates(lat=38.12, lon=55.43), _id=1),
+                         Object('Object 2', 'Description 2', Coordinates(lat=38.99, lon=55.01), _id=2)]
+        db.add(objects_in_db[0])
+        db.add(objects_in_db[1])
+        list_id = [1, 2]
+        objects = db.get_items_by_list_id('objects', list_id)
+        assert objects_in_db[0].name == objects[0].name
+        assert objects_in_db[1].name == objects[1].name
+
+    def test_delete_items_by_list_id(self):
+        assert db.delete_items_by_list_id([1, 2], 'objects') is True
 
 
 class TestUser:
@@ -89,7 +106,7 @@ class TestUser:
         assert users[0].email == user_2.email
 
     def test_delete_users(self):
-        assert db.delete_users([2, 3]) is True
+        assert db.delete_items_by_list_id([2, 3], 'users') is True
 
 
 class TestExcursion:
@@ -115,6 +132,10 @@ class TestExcursion:
         assert excursions[0].name == new_excursions.name
         assert excursions[0].url_map_route == new_excursions.url_map_route
 
+    def test_update_url(self):
+        self.excursion.url_map_route = 'map_map'
+        assert db.update_url(self.excursion) is True
+
 
 class TestTrack:
     def setup_class(cls):
@@ -134,6 +155,25 @@ class TestTrack:
         assert type(track) is Track
         assert track.name == self.track.name
 
+
+class TestExcursionPoint:
+    def setup_class(cls):
+        cls.points = [ExcursionPoint(1, 1, 1, 1, 1), ExcursionPoint(1, 2, 2, 2, 2), ExcursionPoint(1, 3, 3, 3, 3)]
+        db.add(cls.points[0])
+        db.add(cls.points[1])
+        db.add(cls.points[2])
+
+    def teardown_class(cls):
+        db = Database()
+        points = db.get_collection('excursion_points')
+        keys = db.get_collection('table_keys')
+        points.delete_many({})
+        keys.delete_many({})
+
+    def test_get_points(self):
+        points = db.get_points(1)
+        assert len(points) == 3
+        assert points[0].sequence_number == self.points[0].sequence_number
 
 
 class TestTableKey:

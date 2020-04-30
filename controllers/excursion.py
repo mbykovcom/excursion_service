@@ -7,6 +7,7 @@ from database import db
 from models.excursion import Excursion, ExcursionIn, ExcursionUpdate
 from models.user_excurion import UserExcursion
 
+from controllers import excursion_point as point_service
 TABLE = 'excursions'
 
 
@@ -25,7 +26,14 @@ def delete_excursion(excursion_id: int) -> Excursion:
     deleted_excursion = db.get_data_by_id(excursion_id, TABLE)
     result = db.delete(excursion_id, TABLE)
     if result:
-        return deleted_excursion
+        points = point_service.get_excursion_points_by_excursion(excursion_id)
+        list_point_id = [point._id for point in points]
+        if db.delete_items_by_list_id(list_point_id, 'excursion_points'):
+            return deleted_excursion
+        else:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='The excursion was deleted, '
+                                                                                          'but was not already deleted '
+                                                                                          'excursion points')
     else:
         return None
 
@@ -77,3 +85,13 @@ def buy_excursion(excursion_id: int, user_id: int) -> UserExcursion:
         return db.add(user_excursion)
     else:
         return None
+
+
+def update_url_map_route(excursion_id: int) -> Excursion:
+    excursion = get_excursion_by_id(excursion_id)
+    if not excursion:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='An excursion with this id was not found')
+    if db.update_url(excursion):
+        return excursion
+    else:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='Failed to update the excursion')

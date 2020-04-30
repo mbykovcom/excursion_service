@@ -82,4 +82,4 @@ def delete_users(list_id: List[int]) -> bool:
            :param list_id: list of user IDs to delete
            :return: the result of the removal
            """
-    return db.delete_users(list_id)
+    return db.delete_items_by_list_id(list_id, 'users')

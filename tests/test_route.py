@@ -1,3 +1,4 @@
+import copy
 from datetime import timedelta
 from time import sleep
 
@@ -5,15 +6,20 @@ from starlette.testclient import TestClient
 
 from app import app
 from config import Config
-from controllers.user import login, create_user
 from database.connection import Database
+
 from models.excursion import Excursion
+from models.excursion_point import ExcursionPoint
 from models.object import Object, Coordinates
 from models.track import Track
 from models.user import User, UserAuth
+
 from utils import auth
 from utils.auth import get_hash_password
+
+from controllers.user import login, create_user
 from controllers import excursion as excursion_service
+from controllers import object as object_service
 
 client = TestClient(app)
 
@@ -195,15 +201,29 @@ class TestExcursion:
                    'user': login(UserAuth(email=cls.user.email, password='UserPassword_1')).access_token}
 
         cls.excursions = [Excursion(name='Excursion', description='Excursion`s description', price=100.5)]
+        cls.points = [ExcursionPoint(id_excursion=2, id_object=1, id_track=1, sequence_number=1)]
+        cls.objects = [Object(name='Object 1', description='Object`s description', location=Coordinates(lat=59.9390,
+                                                                                                        lon=30.3157)),
+                       Object(name='Object 2', description='Object`s description', location=Coordinates(lat=59.937,
+                                                                                                        lon=30.3187)),
+                       Object(name='Object 3', description='Object`s description', location=Coordinates(lat=59.938,
+                                                                                                        lon=30.3167))]
+        object_service.create_object(cls.objects[0])
+        object_service.create_object(cls.objects[1])
+        object_service.create_object(cls.objects[2])
 
     def teardown_class(cls):
         db = Database()
         users = db.get_collection('users')
         excursions = db.get_collection('excursions')
+        points = db.get_collection('excursion_points')
+        objects = db.get_collection('objects')
         user_excursions = db.get_collection('user_excursions')
         keys = db.get_collection('table_keys')
         users.delete_many({})
         excursions.delete_many({})
+        points.delete_many({})
+        objects.delete_many({})
         user_excursions.delete_many({})
         keys.delete_many({})
 
@@ -271,7 +291,6 @@ class TestExcursion:
     def test_edit_excursion(self):
         json = {'name': 'Name update'}
         headers = {'jwt': self.jwt['admin']}
-        print(self.excursions)
         self.excursions[1].name = json['name']
         response = client.put(f"/excursion/{self.excursions[1]._id}", headers=headers, json=json)
         assert response.status_code == 200
@@ -321,6 +340,154 @@ class TestExcursion:
         response = client.delete(f"/excursion/{self.excursions[0]._id}", headers=headers)
         assert response.status_code == 404
         assert response.json() == {'detail': 'An excursion with this id was not found'}
+
+    # EXCURSION POINTS
+
+    def test_create_excursion_point(self):
+        json = {'id_excursion': self.excursions[1]._id, 'id_object': self.objects[0]._id, 'id_track': 1,
+                'sequence_number': 1}
+        headers = {'jwt': self.jwt['admin']}
+
+        response = client.post(f'/excursion/{self.excursions[0]._id}/point', headers=headers, json=json)
+        assert response.status_code == 404
+        assert response.json() == {'detail': 'An excursion with this id was not found'}
+
+        response = client.post(f'/excursion/{self.excursions[1]._id}/point', headers=headers, json=json)
+        assert response.status_code == 201
+        response = response.json()
+        assert response == {'id': 1,
+                            'id_excursion': self.points[0].id_excursion,
+                            'id_object': self.points[0].id_object,
+                            'id_track': self.points[0].id_track,
+                            'sequence_number': self.points[0].sequence_number}
+
+        self.points[0]._id = response['id']
+        response = client.get(f"/excursion/{self.excursions[1]._id}", headers=headers)
+        assert response.status_code == 200
+        assert response.json()['url_map_route'] != 'URL'
+        self.excursions[1].url_map_route = response.json()['url_map_route']
+
+    def test_delete_excursion_point(self):
+        headers = {'jwt': self.jwt['admin']}
+
+        response = client.delete(f'/excursion/{self.excursions[0]._id}/point/{self.points[0]._id}', headers=headers)
+        assert response.status_code == 404
+        assert response.json() == {'detail': 'An excursion with this id was not found'}
+
+        response = client.delete(f"/excursion/{self.excursions[1]._id}/point/{self.points[0]._id}", headers=headers)
+        assert response.status_code == 200
+        assert response.json() == {'id': self.points[0]._id,
+                                   'id_excursion': self.points[0].id_excursion,
+                                   'id_object': self.points[0].id_object,
+                                   'id_track': self.points[0].id_track,
+                                   'sequence_number': self.points[0].sequence_number}
+
+        response = client.delete(f"/excursion/{self.excursions[1]._id}/point/{self.points[0]._id}", headers=headers)
+        assert response.status_code == 404
+        assert response.json() == {'detail': 'An excursion point with this id was not found'}
+
+    def test_get_excursion_point_by_id(self):
+        headers = {'jwt': self.jwt['admin']}
+        json = {'id_excursion': self.excursions[1]._id, 'id_object': self.objects[0]._id, 'id_track': 1,
+                'sequence_number': 1}
+
+        response = client.get(f'/excursion/{self.excursions[0]._id}/point/{self.points[0]._id}', headers=headers)
+        assert response.status_code == 404
+        assert response.json() == {'detail': 'An excursion with this id was not found'}
+
+        response = client.post(f'/excursion/{self.excursions[1]._id}/point', headers=headers, json=json)
+        self.points[0]._id = response.json()['id']
+        response = client.get(f"/excursion/{self.excursions[1]._id}/point/{self.points[0]._id}", headers=headers)
+        assert response.status_code == 200
+        assert response.json() == {'id': self.points[0]._id,
+                                   'id_excursion': self.points[0].id_excursion,
+                                   'id_object': self.points[0].id_object,
+                                   'id_track': self.points[0].id_track,
+                                   'sequence_number': self.points[0].sequence_number}
+
+        response = client.get(f"/excursion/{self.excursions[1]._id}/point/10", headers=headers)
+        assert response.status_code == 404
+        assert response.json() == {'detail': 'An excursion point with this id was not found'}
+
+    def test_get_excursion_points(self):
+        headers = {'jwt': self.jwt['admin']}
+        json = {'id_excursion': self.excursions[1]._id, 'id_object': self.objects[0]._id, 'id_track': 1,
+                'sequence_number': 1}
+
+        response = client.get(f"/excursion/{self.excursions[0]._id}/point", headers=headers)
+        assert response.status_code == 404
+        assert response.json() == {'detail': 'An excursion with this id was not found'}
+
+        client.delete(f"/excursion/{self.excursions[1]._id}/point/{self.points[0]._id}", headers=headers)
+        response = client.get(f"/excursion/{self.excursions[1]._id}/point", headers=headers)
+        assert response.status_code == 404
+        assert response.json() == {'detail': 'An excursion with this id has no excursion point'}
+
+        response = client.post(f'/excursion/{self.excursions[1]._id}/point', headers=headers, json=json)
+        self.points[0]._id = response.json()['id']
+        self.points.append(copy.deepcopy(self.points[0]))
+        json['id_object'] = self.points[1].id_object = self.objects[1]._id
+        json['id_track'] = self.points[1].id_track = 2
+        json['sequence_number'] = self.points[1].sequence_number = 2
+        response = client.post(f'/excursion/{self.excursions[1]._id}/point', headers=headers, json=json)
+        self.points[1]._id = response.json()['id']
+        response = client.get(f"/excursion/{self.excursions[1]._id}/point", headers=headers)
+        assert response.status_code == 200
+        response = response.json()
+        assert len(response) == 2
+        assert response[1] == {'id': self.points[1]._id,
+                               'id_excursion': self.points[1].id_excursion,
+                               'id_object': self.points[1].id_object,
+                               'id_track': self.points[1].id_track,
+                               'sequence_number': self.points[1].sequence_number}
+
+    def test_edit_excursion_point(self):
+        json = {'id_object': None, 'id_track': None}
+        headers = {'jwt': self.jwt['admin']}
+
+        self.excursions[1].url_map_route = client.get(f"/excursion/{self.excursions[1]._id}", headers=headers).json()['url_map_route']
+        response = client.put(f"/excursion/{self.excursions[1]._id}/point/{self.points[0]._id}", headers=headers,
+                              json=json)
+        assert response.status_code == 200
+        assert response.json() == {'id': self.points[0]._id,
+                                   'id_excursion': self.points[0].id_excursion,
+                                   'id_object': self.points[0].id_object,
+                                   'id_track': self.points[0].id_track,
+                                   'sequence_number': self.points[0].sequence_number}
+        assert self.excursions[1].url_map_route == client.get(f"/excursion/{self.excursions[1]._id}",
+                                                              headers=headers).json()['url_map_route']
+
+        json['id_track'] = 3
+        self.points[0].id_track = json['id_track']
+        response = client.put(f"/excursion/{self.excursions[1]._id}/point/{self.points[0]._id}", headers=headers,
+                              json=json)
+        assert response.status_code == 200
+        assert response.json() == {'id': self.points[0]._id,
+                                   'id_excursion': self.points[0].id_excursion,
+                                   'id_object': self.points[0].id_object,
+                                   'id_track': self.points[0].id_track,
+                                   'sequence_number': self.points[0].sequence_number}
+        assert self.excursions[1].url_map_route == client.get(f"/excursion/{self.excursions[1]._id}",
+                                                              headers=headers).json()['url_map_route']
+
+        json['id_object'] = self.objects[2]._id
+        json['id_track'] = 4
+        self.points[0].id_track = json['id_track']
+        self.points[0].id_object = json['id_object']
+        response = client.put(f"/excursion/{self.excursions[1]._id}/point/{self.points[0]._id}", headers=headers,
+                              json=json)
+        assert response.status_code == 200
+        assert response.json() == {'id': self.points[0]._id,
+                                   'id_excursion': self.points[0].id_excursion,
+                                   'id_object': self.points[0].id_object,
+                                   'id_track': self.points[0].id_track,
+                                   'sequence_number': self.points[0].sequence_number}
+        assert self.excursions[1].url_map_route != client.get(f"/excursion/{self.excursions[1]._id}",
+                                                              headers=headers).json()['url_map_route']
+
+        response = client.get(f'/excursion/{self.excursions[1]._id}/point/10', headers=headers, json=json)
+        assert response.status_code == 404
+        assert response.json() == {'detail': 'An excursion point with this id was not found'}
 
 
 class TestTrack:
@@ -411,7 +578,7 @@ class TestTrack:
         track_update = {'track_data': ('update.mp3', b'Update 1')}
         self.tracks[1].name = 'Update 1'
         response = client.put(f'/track/{self.tracks[1]._id}', headers=headers, files=track_update,
-                               data={'name': self.tracks[1].name})
+                              data={'name': self.tracks[1].name})
         assert response.status_code == 200
         response = response.json()
         assert response == {'id': self.tracks[1]._id,
