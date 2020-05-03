@@ -4,10 +4,12 @@ from fastapi import HTTPException
 from starlette import status
 
 from database import db
-from models.excursion import Excursion, ExcursionIn, ExcursionUpdate
+from models.excursion import Excursion, ExcursionUpdate
 from models.user_excurion import UserExcursion
 
 from controllers import excursion_point as point_service
+from controllers import user_excursion as user_excursion_service
+
 TABLE = 'excursions'
 
 
@@ -78,18 +80,17 @@ def update_excursion(excursion_id: int, excursion_update: ExcursionUpdate) -> Ex
 
 
 def buy_excursion(excursion_id: int, user_id: int) -> UserExcursion:
+    if db.check_user_excursion_is_active(excursion_id):
+        raise HTTPException(status_code=500, detail='This excursion has already been added by the user')
     excursion = get_excursion_by_id(excursion_id)
     if excursion and excursion.url_map_route is not None:
-        user_excursion = UserExcursion(user_id, excursion_id, True)
-        user_excursion._id = db.get_last_id(TABLE).last_id
-        return db.add(user_excursion)
-    else:
-        return None
+        user_excursions = user_excursion_service.get_user_excursions_by_user_id(user_id)
+        return user_excursion_service.create_user_excursion(user_id, excursion_id)
 
 
-def update_url_map_route(excursion_id: int) -> Excursion:
-    excursion = get_excursion_by_id(excursion_id)
-    if not excursion:
+def update_url_map_route(excursion: Excursion) -> Excursion:
+    excursion_db = get_excursion_by_id(excursion._id)
+    if not excursion_db:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='An excursion with this id was not found')
     if db.update_url(excursion):
         return excursion

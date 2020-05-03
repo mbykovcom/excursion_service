@@ -10,7 +10,7 @@ from models.track import Track
 
 from config import Config
 
-URL = f'https://{Config.S3_END_POINT}/{Config.BUCKET}'
+URL = f'{Config.S3_END_POINT}/{Config.BUCKET}'
 
 
 def add_track(track_data: bytes, name: str) -> Track:
@@ -108,6 +108,11 @@ def update_track(track_id: int, track_binary: bytes = None, name: str = None) ->
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='Failed to update the track')
 
 
+def get_tracks_by_list_id(list_id: List[int]) -> List[Track]:
+    list = db.get_items_by_list_id('tracks', list_id)
+    return list
+
+
 # S3 functions
 
 
@@ -139,7 +144,7 @@ def get_track_from_cloud(name: str) -> bytes:
 def delete_track_form_cloud(name: str):
     client_s3 = create_client_s3()
     result = client_s3.delete_object(Bucket=Config.BUCKET, Key=name)
-    if result['ResponseMetadata']['HTTPStatusCode'] == 204:     # Boto3 bug: always returns 204
+    if result['ResponseMetadata']['HTTPStatusCode'] == 204:  # Boto3 bug: always returns 204
         return True
     else:
         return False

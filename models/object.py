@@ -30,7 +30,8 @@ class Object:
 
     def __repr__(self):
         return f"Object: {self._id} | name: {self.name} | description: {self.description} | " \
-               f"location: lat={self.location.lat} lon={self.location.lon}"
+               f"location: lat={self.location[0]} lon={self.location[1]}"
 
     def object_out(self):
-        return ObjectOut(id=self._id, name=self.name, description=self.description, location=self.location)
+        return ObjectOut(id=self._id, name=self.name, description=self.description, location={'lon': self.location[1],
+                         'lat': self.location[0]})

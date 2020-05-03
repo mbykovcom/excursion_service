@@ -4,7 +4,7 @@ from fastapi import HTTPException
 from starlette import status
 
 from database import db
-from models.object import Object, ObjectUpdate
+from models.object import Object, ObjectUpdate, Coordinates
 
 
 def create_object(object_data: Object) -> Object:
@@ -63,12 +63,13 @@ def update_object(object_id: int, obj_update: ObjectUpdate) -> Object:
     if obj_update.description is not None:
         obj.description = obj_update.description
     if obj_update.location is not None:
-        obj.location = obj_update.location
+        obj.location = Coordinates(lat=obj_update.location['lat'], lon=obj_update.location['lon'])
     if db.update_item(obj):
         return obj
     else:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='Failed to update the object')
 
 
-def get_objects_by_list_id(list_id: List[int]) -> List[Object]: # TODO Testing
-    return db.get_items_by_list_id('objects', list_id)
+def get_objects_by_list_id(list_id: List[int]) -> List[Object]:
+    list = db.get_items_by_list_id('objects', list_id)
+    return list

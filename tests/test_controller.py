@@ -6,12 +6,13 @@ from fastapi import HTTPException
 from pytest import raises
 
 from database.connection import Database
-from models.excursion_point import ExcursionPoint, ExcursionPointUpdate
+from models.excursion_point import ExcursionPoint, ExcursionPointDetails
 from models.track import Track
 from models.user import User, UserAuth
 from models.object import Object, Coordinates, ObjectUpdate
-from models.excursion import Excursion, ExcursionUpdate
+from models.excursion import Excursion, ExcursionUpdate, ExcursionOut
 from models.other import Token
+from models.user_excurion import UserExcursion, UserExcursionsDetail, UserExcursionDetail
 
 from utils.auth import get_hash_password
 from controllers import user as user_service
@@ -19,6 +20,7 @@ from controllers import object as object_service
 from controllers import excursion as excursion_service
 from controllers import excursion_point as point_service
 from controllers import track as track_service
+from controllers import user_excursion as user_excursion_service
 
 
 class TestUser:
@@ -77,8 +79,8 @@ class TestUser:
 class TestObject:
 
     def setup_class(cls):
-        cls.obj = Object(name='Object', description='Object`s description', location=Coordinates(lat=59.9390,
-                                                                                                 lon=30.3157))
+        cls.obj = [Object(name='Object', description='Object`s description', location=Coordinates(lat=59.9390,
+                                                                                                  lon=30.3157))]
         cls.jwt = None
 
     def teardown_class(cls):
@@ -89,25 +91,33 @@ class TestObject:
         keys.delete_many({})
 
     def test_create_object(self):
-        obj = object_service.create_object(self.obj)
+        obj = object_service.create_object(self.obj[0])
         assert type(obj) is Object
 
     def test_delete_object(self):
         obj = object_service.delete_object(1)
-        assert obj.name == self.obj.name
+        self.obj[0]._id = obj._id
+        assert obj.name == self.obj[0].name
 
     def test_get_object_by_id(self):
-        new_obj = object_service.create_object(self.obj)
+        new_obj = object_service.create_object(self.obj[0])
         obj = object_service.get_object_by_id(2)
         assert obj.name == new_obj.name
+        self.obj.append(obj)
 
     def test_get_objects(self):
-        obj_copy = copy.deepcopy(self.obj)
-        obj_copy.name = 'Object 3'
-        object_service.create_object(obj_copy)
+        new_obj = copy.deepcopy(self.obj[0])
+        new_obj.name = 'Object 3'
+        object_service.create_object(new_obj)
         objects = object_service.get_objects()
         assert len(objects) == 2
-        assert objects[1].name == obj_copy.name
+        assert objects[1].name == new_obj.name
+        self.obj.append(objects[1])
+
+    def test_get_objects_by_list_id(self):
+        objects = object_service.get_objects_by_list_id([self.obj[1]._id, self.obj[2]._id])
+        assert len(objects) == 2
+        assert objects[0].name == self.obj[1].name
 
     def test_update_object(self):
         update = ObjectUpdate(name='Update name')
@@ -115,12 +125,14 @@ class TestObject:
         assert type(result) is Object
         assert result.name == update.name
         update.description = 'Update description'
-        update.location = Coordinates(lat=0.0, lon=0.0)
+        update.location = {'lat': 0.0, 'lon': 0.0}
         result = object_service.update_object(3, update)
         assert type(result) is Object
         assert result.name == update.name
         assert result.description == update.description
-        assert result.location == update.location
+        assert type(result.location) is Coordinates
+        assert result.location.lat == update.location['lat']
+        assert result.location.lon == update.location['lon']
         result = object_service.update_object(10, update)
         assert result is None
 
@@ -217,6 +229,9 @@ class TestExcursion:
         assert user_excursion.id_last_point == 0
         assert user_excursion.is_active is True
 
+        with raises(HTTPException):
+            assert excursion_service.buy_excursion(self.excursions[2]._id, self.user._id)
+
         user_excursion = excursion_service.buy_excursion(10, self.user._id)
         assert user_excursion is None
 
@@ -279,6 +294,11 @@ class TestTrack:
         assert len(tracks) == 2
         assert tracks[0].name == self.tracks[1].name
         assert tracks[0].url == self.tracks[1].url
+
+    def test_get_tracks_by_list_id(self):
+        tracks = track_service.get_tracks_by_list_id([self.tracks[1]._id, self.tracks[2]._id])
+        assert len(tracks) == 2
+        assert tracks[0].name == self.tracks[1].name
 
     def test_update_track(self):
         result = track_service.update_track(self.tracks[1]._id)
@@ -383,11 +403,99 @@ class TestExcursionPoints:
         excursion.create_url_map_route()
         assert excursion.url_map_route is not None
 
+    def test_check_track_in_excursion(self):
+        result = point_service.check_track_in_excursion(1, 2)
+        assert result is True
+        result = point_service.check_track_in_excursion(1, 5)
+        assert result is False
+
     def test_delete_excursion_point(self):
         point = point_service.delete_excursion_point(self.points[2]._id)
         assert point._id == self.points[2]._id
         point = point_service.delete_excursion_point(10)
         assert point is None
+
+
+class TestUserExcursions:
+
+    def setup_class(cls):
+        cls.excursions = [Excursion(name='Excursion', description='Excursion`s description', price=100.5)]
+        cls.excursions[0] = excursion_service.create_excursion(cls.excursions[0])
+        cls.objects = [Object(name='Object', description='Object`s description',
+                              location=Coordinates(lat=59.9390, lon=30.3157)),
+                       Object(name='Object', description='Object`s description',
+                              location=Coordinates(lat=59.937, lon=30.3187))]
+        cls.objects[0] = object_service.create_object(cls.objects[0])
+        cls.objects[1] = object_service.create_object(cls.objects[1])
+        cls.tracks = [track_service.add_track(b'Track 1', 'Track 1'), track_service.add_track(b'Track 2', 'Track 2')]
+        cls.points = [ExcursionPoint(cls.excursions[0]._id, cls.objects[0]._id, cls.tracks[0]._id, 1),
+                      ExcursionPoint(cls.excursions[0]._id, cls.objects[1]._id, cls.tracks[1]._id, 2)]
+        cls.points[0] = point_service.create_excursion_point(cls.points[0])
+        cls.points[1] = point_service.create_excursion_point(cls.points[1])
+        cls.user_excursions = [UserExcursion(1, 1, True)]
+
+    def teardown_class(cls):
+        db = Database()
+        points = db.get_collection('excursion_points')
+        excursions = db.get_collection('excursions')
+        objects = db.get_collection('objects')
+        tracks = db.get_collection('tracks')
+        user_excursions = db.get_collection('user_excursions')
+        keys = db.get_collection('table_keys')
+        points.delete_many({})
+        excursions.delete_many({})
+        objects.delete_many({})
+        tracks.delete_many({})
+        user_excursions.delete_many({})
+        keys.delete_many({})
+
+    def test_create_user_excursion(self):
+        user_excursion = user_excursion_service.create_user_excursion(1, self.excursions[0]._id)
+        assert type(user_excursion) is UserExcursion
+        assert user_excursion.id_user == 1
+        assert user_excursion.is_active is True
+        assert user_excursion.id_excursion == self.excursions[0]._id
+        assert user_excursion.id_last_point == 0
+        self.user_excursions[0] = user_excursion
+
+    def test_deactivate_user_excursion(self):
+        user_excursion = user_excursion_service.deactivate_user_excursion(self.user_excursions[0]._id)
+        assert user_excursion.is_active is False
+        user_excursion = user_excursion_service.deactivate_user_excursion(10)
+        assert user_excursion is None
+
+    def test_get_user_excursions_by_user_id(self):
+        user_excursions = user_excursion_service.get_user_excursions_by_user_id(1)
+        assert len(user_excursions) == 0
+        self.user_excursions.append(user_excursion_service.create_user_excursion(1, self.excursions[0]._id))
+        user_excursions = user_excursion_service.get_user_excursions_by_user_id(1)
+        assert len(user_excursions) == 1
+        assert user_excursions[0]._id == self.user_excursions[1]._id
+
+    def test_get_user_excursions_by_id(self):
+        user_excursion = user_excursion_service.get_user_excursion_by_id(self.user_excursions[1]._id)
+        assert type(user_excursion) is UserExcursion
+        assert user_excursion.id_user == 1
+        assert user_excursion.is_active is True
+        assert user_excursion.id_excursion == self.excursions[0]._id
+        assert user_excursion.id_last_point == 0
+
+    def test_update_last_point(self):
+        self.user_excursions[1].id_last_point = 1
+        user_excursion = user_excursion_service.update_last_point(self.user_excursions[1])
+        assert user_excursion.id_last_point == 1
+
+    def test_user_excursion_detail(self):
+        user_excursions_detail = user_excursion_service.user_excursions_detail(self.user_excursions[1])
+        assert type(user_excursions_detail) is UserExcursionDetail
+        assert type(user_excursions_detail.excursion) is ExcursionOut
+        assert type(user_excursions_detail.last_point) is ExcursionPointDetails
+
+    def test_user_excursions_detail(self):
+        user_excursion_detail = user_excursion_service.user_excursion_detail(self.user_excursions[1])
+        assert type(user_excursion_detail) is UserExcursionsDetail
+        assert type(user_excursion_detail.excursion) is ExcursionOut
+        assert len(user_excursion_detail.list_point) == 2
 
 
 if __name__ == '__main__':

@@ -99,7 +99,8 @@ async def create_excursion_point(excursion_id: int, point_data: ExcursionPointIn
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='The excursion point was not '
                                                                                       'created, an error occurred '
                                                                                       'when creating the point')
-    excursion_service.update_url_map_route(excursion_id)
+    excursion.create_url_map_route()
+    excursion_service.update_url_map_route(excursion)
     return point.excursion_point_out()
 
 
@@ -144,7 +145,8 @@ async def edit_excursion_point(excursion_id: int, point_id: int,
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='An excursion with this id was not found')
     excursion = excursion_service.get_excursion_by_id(excursion_id)
     if point_update.id_object:
-        excursion_service.update_url_map_route(excursion_id)
+        excursion.create_url_map_route()
+        excursion_service.update_url_map_route(excursion)
     return update_point.excursion_point_out()
 
 
@@ -160,5 +162,6 @@ async def delete_excursion_point_by_id(excursion_id: int, point_id: int, jwt: st
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='An excursion point with this id was not '
                                                                           'found')
     point = point_service.delete_excursion_point(point_id)
-    excursion_service.update_url_map_route(excursion_id)
+    excursion.create_url_map_route()
+    excursion_service.update_url_map_route(excursion)
     return point.excursion_point_out()

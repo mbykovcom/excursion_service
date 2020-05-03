@@ -7,6 +7,8 @@ from celery.schedules import crontab
 
 from config import ConfigCelery, Config
 from controllers import user as user_service
+from database import db
+
 celery = Celery('celery_app')
 celery.config_from_object(ConfigCelery)
 
@@ -49,3 +51,16 @@ def send_email(email, title, description) -> bool:
 def clearing_inactive_users() -> bool:
     users = user_service.get_users_inactive_24_hours()
     return user_service.delete_users([user._id for user in users])
+
+
+@celery.task
+def deactivate_user_excursions() -> bool:
+    expired_user_excursions = db.get_expired_user_excursions(Config.USER_EXCURSION_EXPIRE_DAYS)
+    count = 0
+    for user_excursion in expired_user_excursions:
+        if db.deactivating_user_excursion(user_excursion._id):
+            count += 1
+    if count == len(expired_user_excursions):
+        return True
+    else:
+        return False

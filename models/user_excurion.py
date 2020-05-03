@@ -1,10 +1,10 @@
 from datetime import datetime
+from typing import List
 
 from pydantic import BaseModel, Field
 
 from .excursion import ExcursionOut
-from .excursion_point import ExcursionPointOut
-from .user import UserOut
+from .excursion_point import ExcursionPointDetails
 
 
 class UserExcursionOut(BaseModel):
@@ -18,9 +18,16 @@ class UserExcursionOut(BaseModel):
 
 class UserExcursionDetail(BaseModel):
     id: int = Field(..., description='User excursion id')
-    user: UserOut = Field(..., description='User data')
     excursion: ExcursionOut = Field(..., description='Data excursion')
-    last_point: ExcursionPointOut = Field(..., description='Name of the point where we stopped')
+    last_point: ExcursionPointDetails = Field(..., description='Name of the point where we stopped')
+    is_active: bool = Field(..., description='Tour status, active 30 days after adding, then inactive')
+    date_added: datetime = Field(..., description='Date added')
+
+
+class UserExcursionsDetail(BaseModel):
+    id: int = Field(..., description='User excursion id')
+    excursion: ExcursionOut = Field(..., description='Data excursion')
+    list_point: List[ExcursionPointDetails] = Field(..., description='Name of the point where we stopped')
     is_active: bool = Field(..., description='Tour status, active 30 days after adding, then inactive')
     date_added: datetime = Field(..., description='Date added')
 

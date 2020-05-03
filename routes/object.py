@@ -2,7 +2,7 @@ from typing import List
 
 from fastapi import status, Body, HTTPException, APIRouter, Header
 
-from models.object import ObjectOut, ObjectIn, Object, ObjectUpdate
+from models.object import ObjectOut, ObjectIn, Object, ObjectUpdate, Coordinates
 from models.other import Error
 from controllers import object as object_service
 from utils import auth
@@ -19,7 +19,8 @@ async def create_object(obj_data: ObjectIn = Body(..., example={"name": "Name of
                                                                              'lon': 30.3157901763916}}),
                         jwt: str = Header(..., example='key')):
     auth.authentication(jwt, 'admin')
-    new_obj = Object(**obj_data.dict())
+    new_obj = Object(name=obj_data.name, description=obj_data.description,
+                     location=Coordinates(lat=obj_data.location['lat'], lon=obj_data.location['lon']))
     new_obj = object_service.create_object(new_obj)
     if new_obj:
         return new_obj.object_out()

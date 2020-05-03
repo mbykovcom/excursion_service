@@ -13,11 +13,12 @@ from models.excursion_point import ExcursionPoint
 from models.object import Object, Coordinates
 from models.track import Track
 from models.user import User, UserAuth
+from models.user_excurion import UserExcursion
 
 from utils import auth
 from utils.auth import get_hash_password
 
-from controllers.user import login, create_user
+from controllers import user as user_service
 from controllers import excursion as excursion_service
 from controllers import object as object_service
 
@@ -104,8 +105,9 @@ class TestObject:
         cls.admin = User(email='admin@email.ru', hash_password=get_hash_password('AdminPassword_1'), name='Admin',
                          role='admin',
                          is_active=True)
-        create_user(cls.admin)
-        cls.headers = {'jwt': login(UserAuth(email='admin@email.ru', password='AdminPassword_1')).access_token}
+        user_service.create_user(cls.admin)
+        cls.headers = {'jwt': user_service.login(UserAuth(email='admin@email.ru',
+                                                          password='AdminPassword_1')).access_token}
 
         cls.obj = Object(name='Object', description='Object`s description', location=Coordinates(lat=59.9390,
                                                                                                  lon=30.3157))
@@ -192,13 +194,14 @@ class TestExcursion:
         cls.admin = User(email='admin@email.ru', hash_password=get_hash_password('AdminPassword_1'), name='Admin',
                          role='admin',
                          is_active=True)
-        create_user(cls.admin)
+        user_service.create_user(cls.admin)
         cls.user = User(email='user@email.ru', hash_password=get_hash_password('UserPassword_1'), name='User',
                         is_active=True)
-        create_user(cls.user)
+        user_service.create_user(cls.user)
 
-        cls.jwt = {'admin': login(UserAuth(email=cls.admin.email, password='AdminPassword_1')).access_token,
-                   'user': login(UserAuth(email=cls.user.email, password='UserPassword_1')).access_token}
+        cls.jwt = {'admin': user_service.login(UserAuth(email=cls.admin.email,
+                                                        password='AdminPassword_1')).access_token,
+                   'user': user_service.login(UserAuth(email=cls.user.email, password='UserPassword_1')).access_token}
 
         cls.excursions = [Excursion(name='Excursion', description='Excursion`s description', price=100.5)]
         cls.points = [ExcursionPoint(id_excursion=2, id_object=1, id_track=1, sequence_number=1)]
@@ -375,6 +378,7 @@ class TestExcursion:
         assert response.json() == {'detail': 'An excursion with this id was not found'}
 
         response = client.delete(f"/excursion/{self.excursions[1]._id}/point/{self.points[0]._id}", headers=headers)
+        print(response.json())
         assert response.status_code == 200
         assert response.json() == {'id': self.points[0]._id,
                                    'id_excursion': self.points[0].id_excursion,
@@ -496,13 +500,13 @@ class TestTrack:
         cls.admin = User(email='admin@email.ru', hash_password=get_hash_password('AdminPassword_1'), name='Admin',
                          role='admin',
                          is_active=True)
-        create_user(cls.admin)
+        user_service.create_user(cls.admin)
         cls.user = User(email='user@email.ru', hash_password=get_hash_password('UserPassword_1'), name='User',
                         is_active=True)
-        create_user(cls.user)
+        user_service.create_user(cls.user)
 
-        cls.jwt = {'admin': login(UserAuth(email=cls.admin.email, password='AdminPassword_1')).access_token,
-                   'user': login(UserAuth(email=cls.user.email, password='UserPassword_1')).access_token}
+        cls.jwt = {'admin': user_service.login(UserAuth(email=cls.admin.email, password='AdminPassword_1')).access_token,
+                   'user': user_service.login(UserAuth(email=cls.user.email, password='UserPassword_1')).access_token}
 
         cls.tracks = [Track('Track')]
         cls.track_binary = b'track'
@@ -535,7 +539,7 @@ class TestTrack:
         assert response.json() == {'detail': 'Invalid file extension'}
 
     def test_get_track_by_id(self):
-        headers = {'jwt': self.jwt['user']}
+        headers = {'jwt': self.jwt['admin']}
         response = client.get(f"/track/{self.tracks[0]._id}", headers=headers)
         assert response.status_code == 200
         assert response.json() == {'id': self.tracks[0]._id,
@@ -610,3 +614,191 @@ class TestTrack:
         response = client.put('/track/10', headers=headers, files=track_update, data={'name': self.tracks[1].name})
         assert response.status_code == 404
         assert response.json() == {'detail': 'A track with this id was not found'}
+
+
+class TestUserExcursion:
+    def setup_class(cls):
+        cls.user = User(email='user@email.ru', hash_password=get_hash_password('UserPassword_1'), name='User',
+                        is_active=True)
+        cls.user = user_service.create_user(cls.user)
+
+        cls.admin = User(email='admin@email.ru', hash_password=get_hash_password('AdminPassword_1'), name='Admin',
+                         role='admin',
+                         is_active=True)
+        user_service.create_user(cls.admin)
+
+        cls.headers = {'user': {'jwt': user_service.login(UserAuth(email=cls.user.email,
+                                                                   password='UserPassword_1')).access_token},
+                       'admin': {'jwt': user_service.login(UserAuth(email=cls.admin.email,
+                                                                   password='AdminPassword_1')).access_token}}
+
+        cls.objects = [Object(name='Object 1', description='Object`s description', location=Coordinates(lat=59.9390,
+                                                                                                        lon=30.3157)),
+                       Object(name='Object 2', description='Object`s description', location=Coordinates(lat=59.937,
+                                                                                                        lon=30.3187)),
+                       Object(name='Object 3', description='Object`s description', location=Coordinates(lat=59.938,
+                                                                                                        lon=30.3167))]
+        json = {'name': cls.objects[0].name, 'description': cls.objects[0].description,
+               'location': {'lat': cls.objects[0].location.lat, 'lon': cls.objects[0].location.lon}}
+        cls.objects[0]._id = client.post('/object', json=json, headers=cls.headers['admin']).json()['id']
+        json = {'name': cls.objects[1].name, 'description': cls.objects[1].description,
+                'location': {'lat': cls.objects[1].location.lat, 'lon': cls.objects[1].location.lon}}
+        cls.objects[1]._id = client.post('/object', json=json, headers=cls.headers['admin']).json()['id']
+        json = {'name': cls.objects[2].name, 'description': cls.objects[2].description,
+                'location': {'lat': cls.objects[2].location.lat, 'lon': cls.objects[2].location.lon}}
+        cls.objects[2]._id = client.post('/object', json=json, headers=cls.headers['admin']).json()['id']
+
+        cls.tracks = [Track('Track 1'), Track('Track 2'), Track('Track 3')]
+
+        track_upload = {'track_data': ('track 1.mp3', b'Track 1')}
+        response = client.post('/track', headers=cls.headers['admin'], files=track_upload,
+                               data={'name': cls.tracks[0].name})
+        response = response.json()
+        cls.tracks[0]._id = response['id']
+        cls.tracks[0].url = response['url']
+
+        track_upload = {'track_data': ('track 2.mp3', b'Track 2')}
+        response = client.post('/track', headers=cls.headers['admin'], files=track_upload,
+                               data={'name': cls.tracks[1].name})
+        response = response.json()
+        cls.tracks[1]._id = response['id']
+        cls.tracks[1].url = response['url']
+
+        track_upload = {'track_data': ('track 3.mp3', b'Track 3')}
+        response = client.post('/track', headers=cls.headers['admin'], files=track_upload,
+                               data={'name': cls.tracks[2].name})
+        response = response.json()
+        cls.tracks[2]._id = response['id']
+        cls.tracks[2].url = response['url']
+
+
+        cls.excursions = [Excursion(name='Excursion 1', description='Excursion`s description', price=100.5),
+                          Excursion(name='Excursion 2', description='Excursion`s description', price=150.5)]
+
+        json = {'name': cls.excursions[0].name, 'description': cls.excursions[0].description,
+                'price': cls.excursions[0].price}
+        cls.excursions[0]._id = client.post('/excursion', headers=cls.headers['admin'], json=json).json()['id']
+        json = {'name': cls.excursions[1].name, 'description': cls.excursions[1].description,
+                'price': cls.excursions[1].price}
+        cls.excursions[1]._id = client.post('/excursion', headers=cls.headers['admin'], json=json).json()['id']
+
+
+        cls.points = [ExcursionPoint(id_excursion=cls.excursions[0]._id, id_object=cls.objects[0]._id,
+                                     id_track=cls.tracks[0]._id, sequence_number=1),
+                      ExcursionPoint(id_excursion=cls.excursions[0]._id, id_object=cls.objects[1]._id,
+                                     id_track=cls.tracks[1]._id, sequence_number=2),
+                      ExcursionPoint(id_excursion=cls.excursions[0]._id, id_object=cls.objects[2]._id,
+                                     id_track=cls.tracks[2]._id, sequence_number=3),
+                      ExcursionPoint(id_excursion=cls.excursions[1]._id, id_object=cls.objects[0]._id,
+                                     id_track=cls.tracks[2]._id, sequence_number=1),
+                      ExcursionPoint(id_excursion=cls.excursions[1]._id, id_object=cls.objects[2]._id,
+                                     id_track=cls.tracks[0]._id, sequence_number=2)]
+
+        json = {'id_excursion': cls.points[0].id_excursion, 'id_object': cls.points[0].id_object,
+                'id_track': cls.points[0].id_track, 'sequence_number': cls.points[0].sequence_number}
+        cls.points[0]._id = client.post(f'/excursion/{cls.excursions[0]._id}/point', headers=cls.headers['admin'],
+                                        json=json).json()['id']
+        json = {'id_excursion': cls.points[1].id_excursion, 'id_object': cls.points[1].id_object,
+                'id_track': cls.points[1].id_track, 'sequence_number': cls.points[1].sequence_number}
+        cls.points[1]._id = client.post(f'/excursion/{cls.excursions[0]._id}/point', headers=cls.headers['admin'],
+                                        json=json).json()['id']
+        json = {'id_excursion': cls.points[2].id_excursion, 'id_object': cls.points[2].id_object,
+                'id_track': cls.points[2].id_track, 'sequence_number': cls.points[2].sequence_number}
+        cls.points[2]._id = client.post(f'/excursion/{cls.excursions[0]._id}/point', headers=cls.headers['admin'],
+                                        json=json).json()['id']
+        json = {'id_excursion': cls.points[3].id_excursion, 'id_object': cls.points[3].id_object,
+                'id_track': cls.points[3].id_track, 'sequence_number': cls.points[3].sequence_number}
+        cls.points[3]._id = client.post(f'/excursion/{cls.excursions[1]._id}/point', headers=cls.headers['admin'],
+                                        json=json).json()['id']
+        json = {'id_excursion': cls.points[4].id_excursion, 'id_object': cls.points[4].id_object,
+                'id_track': cls.points[4].id_track, 'sequence_number': cls.points[4].sequence_number}
+        cls.points[4]._id = client.post(f'/excursion/{cls.excursions[1]._id}/point', headers=cls.headers['admin'],
+                                        json=json).json()['id']
+
+        cls.user_excursions = []
+        response = client.post(f"/excursion/{cls.excursions[0]._id}", headers=cls.headers['user']).json()
+        cls.user_excursions.append(UserExcursion(_id=response['id'], id_user=response['id_user'],
+                                                 id_excursion=response['id_excursion'],
+                                                 id_last_point=response['id_last_point'],
+                                                 date_added=response['date_added'], is_active=response['is_active']))
+        response = client.post(f"/excursion/{cls.excursions[1]._id}", headers=cls.headers['user']).json()
+        cls.user_excursions.append(UserExcursion(_id=response['id'], id_user=response['id_user'],
+                                                 id_excursion=response['id_excursion'],
+                                                 id_last_point=response['id_last_point'],
+                                                 date_added=response['date_added'], is_active=response['is_active']))
+
+
+
+
+    def teardown_class(cls):
+        db = Database()
+        users = db.get_collection('users')
+        excursions = db.get_collection('excursions')
+        excursion_points = db.get_collection('excursion_points')
+        objects = db.get_collection('objects')
+        tracks = db.get_collection('tracks')
+        user_excursions = db.get_collection('user_excursions')
+        keys = db.get_collection('table_keys')
+        users.delete_many({})
+        excursions.delete_many({})
+        excursion_points.delete_many({})
+        objects.delete_many({})
+        tracks.delete_many({})
+        user_excursions.delete_many({})
+        keys.delete_many({})
+
+    def test_get_user_excursions(self):
+        response = client.get('/user/excursion', headers=self.headers['user'])
+        assert response.status_code == 200
+        response = response.json()
+        assert len(response) == 2
+        assert response[0]['excursion']['id'] == self.user_excursions[0].id_excursion
+        assert response[0]['last_point']['id'] == self.points[0]._id
+        assert response[0]['is_active'] is True
+
+    def test_get_user_excursion_by_id(self):
+        response = client.get(f'/user/excursion/{self.user_excursions[1]._id}', headers=self.headers['user'])
+        assert response.status_code == 200
+        response = response.json()
+        assert response['excursion']['id'] == self.user_excursions[1].id_excursion
+        assert len(response['list_point']) == 2
+        assert response['is_active'] is True
+        response = client.get('/user/excursion/10', headers=self.headers['user'])
+        assert response.status_code == 404
+        assert response.json() == {'detail': 'An user excursion with this id was not found'}
+
+    def test_get_last_track_user_excursion(self):
+        response = client.get(f'/user/excursion/{self.user_excursions[0]._id}/play', headers=self.headers['user'])
+        assert response.status_code == 200
+        response = response.json()
+        assert response == {'id': self.tracks[0]._id,
+                            'name': self.tracks[0].name,
+                            'url': self.tracks[0].url}
+        response = client.get('/user/excursion/10/play', headers=self.headers['user'])
+        assert response.status_code == 404
+        assert response.json() == {'detail': 'An user excursion with this id was not found'}
+
+    def test_get_track_user_excursion_by_id(self):
+        response = client.get(f'/user/excursion/{self.user_excursions[1]._id}/play/{self.tracks[2]._id}',
+                              headers=self.headers['user'])
+        assert response.status_code == 200
+        response = response.json()
+        assert response == {'id': self.tracks[2]._id,
+                            'name': self.tracks[2].name,
+                            'url': self.tracks[2].url}
+        response = client.get('/user/excursion', headers=self.headers['user'])
+        assert response.status_code == 200
+        response = response.json()
+        assert len(response) == 2
+        assert response[1]['excursion']['id'] == self.user_excursions[1].id_excursion
+        assert response[1]['last_point']['id'] == self.points[2]._id
+        assert response[1]['is_active'] is True
+
+        response = client.get(f'/user/excursion/10/play/{self.tracks[2]._id}', headers=self.headers['user'])
+        assert response.status_code == 404
+        assert response.json() == {'detail': 'An user excursion with this id was not found'}
+
+        response = client.get(f'/user/excursion/{self.user_excursions[1]._id}/play/{self.tracks[1]._id}',
+                              headers=self.headers['user'])
+        assert response.status_code == 404
+        assert response.json() == {'detail': 'The track with this id was not found'}

@@ -19,6 +19,7 @@ class Config(object):
     ACCESS_TOKEN_EXPIRE_MINUTES = os.environ.get('ACCESS_TOKEN_EXPIRE_MINUTES', 30)
     # Celery Parameters
     REGISTRATION_EXPIRE_HOURS = os.environ.get('REGISTRATION_EXPIRE_HOURS', 24)
+    USER_EXCURSION_EXPIRE_DAYS = os.environ.get('USER_EXCURSION_EXPIRE_DAYS', 31)
     # Administration settings
     ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'admin@realty.ru')
     ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin')

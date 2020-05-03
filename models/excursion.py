@@ -1,5 +1,3 @@
-import re
-
 from pydantic import BaseModel, Field
 
 from config import Config

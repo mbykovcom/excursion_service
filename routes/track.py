@@ -31,7 +31,7 @@ async def add_track_storage(track_data: UploadFile = File(...), name: str = Form
 @router.get("", status_code=status.HTTP_200_OK, response_model=List[TrackOut], responses={401: {'model': Error},
                                                                                           500: {'model': Error}})
 async def get_tracks(jwt: str = Header(..., example='key')):
-    auth.authentication(jwt)
+    auth.authentication(jwt, 'admin')
     tracks = track_service.get_tracks()
     return [track.track_out() for track in tracks]
 
@@ -40,7 +40,7 @@ async def get_tracks(jwt: str = Header(..., example='key')):
                                                                                                404: {'model': Error},
                                                                                                500: {'model': Error}})
 async def get_track_by_id(track_id: int, jwt: str = Header(..., example='key')):
-    auth.authentication(jwt)
+    auth.authentication(jwt, 'admin')
     track = track_service.get_track_by_id(track_id)
     if not track:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='A track with this id was not found')

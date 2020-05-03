@@ -8,6 +8,7 @@ from models.excursion_point import ExcursionPoint
 from models.object import Object, Coordinates
 from models.other import TableKey
 from models.track import Track
+from models.user_excurion import UserExcursion
 from utils.auth import get_hash_password
 from database import db
 from models.user import User
@@ -159,9 +160,9 @@ class TestTrack:
 class TestExcursionPoint:
     def setup_class(cls):
         cls.points = [ExcursionPoint(1, 1, 1, 1, 1), ExcursionPoint(1, 2, 2, 2, 2), ExcursionPoint(1, 3, 3, 3, 3)]
-        db.add(cls.points[0])
-        db.add(cls.points[1])
-        db.add(cls.points[2])
+        cls.points[0] = db.add(cls.points[0])
+        cls.points[1] = db.add(cls.points[1])
+        cls.points[2] = db.add(cls.points[2])
 
     def teardown_class(cls):
         db = Database()
@@ -174,6 +175,59 @@ class TestExcursionPoint:
         points = db.get_points(1)
         assert len(points) == 3
         assert points[0].sequence_number == self.points[0].sequence_number
+
+    def test_check_track_in_excursion(self):
+        point = db.check_track_in_excursion(1, 1)
+        assert type(point) is ExcursionPoint
+        point = db.check_track_in_excursion(1, 10)
+        assert point is None
+
+
+class TestUserExcursion:
+    def setup_class(cls):
+        cls.user_excursions = [UserExcursion(1, 1, True)]
+        cls.user_excursions[0] = db.add(cls.user_excursions[0])
+
+    def teardown_class(cls):
+        db = Database()
+        user_excursions = db.get_collection('user_excursions')
+        keys = db.get_collection('table_keys')
+        user_excursions.delete_many({})
+        keys.delete_many({})
+
+    def test_get_user_excursion_by_user_id(self):
+        user_excursions = db.get_user_excursion_by_user_id(1)
+        assert len(user_excursions) == 1
+        assert type(user_excursions[0]) is UserExcursion
+        assert user_excursions[0].id_user == 1
+
+    def test_deactivating_user_excursion(self):
+        result = db.deactivating_user_excursion(self.user_excursions[0]._id)
+        assert result is True
+        result = db.deactivating_user_excursion(self.user_excursions[0]._id)
+        assert result is False
+
+    def test_check_user_excursion_is_active(self):
+        self.user_excursions.append(UserExcursion(2, 2, True))
+        self.user_excursions[1] = db.add(self.user_excursions[1])
+        user_excursion = db.check_user_excursion_is_active(self.user_excursions[1].id_excursion)
+        assert type(user_excursion) is UserExcursion
+        assert user_excursion.id_excursion == self.user_excursions[1].id_excursion
+
+        result = db.deactivating_user_excursion(self.user_excursions[1]._id)
+        assert result is True
+
+        user_excursion = db.check_user_excursion_is_active(self.user_excursions[1].id_excursion)
+        assert user_excursion is None
+
+    def test_get_expired_user_excursions(self):
+        self.user_excursions.append(UserExcursion(3, 3, True, date_added=datetime.now() - timedelta(days=31)))
+        self.user_excursions[2] = db.add(self.user_excursions[2])
+        self.user_excursions.append(UserExcursion(4, 4, True, date_added=datetime.now() - timedelta(days=30)))
+        self.user_excursions[3] = db.add(self.user_excursions[3])
+
+        user_excursions = db.get_expired_user_excursions(31)
+        assert len(user_excursions) == 1
 
 
 class TestTableKey:

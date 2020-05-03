@@ -81,7 +81,7 @@ def delete_items_by_list_id(list_id: List[int], collection_name: str) -> bool:
         return False
 
 
-def update_item(update: Union[User, Object, Excursion, Track, ExcursionPoint]) -> bool:
+def update_item(update: Union[User, Object, Excursion, Track, ExcursionPoint, UserExcursion]) -> bool:
     """
     Updates an object in the collection
     :param update: Object to update
@@ -94,6 +94,8 @@ def update_item(update: Union[User, Object, Excursion, Track, ExcursionPoint]) -
         table = 'objects'
     elif type(update) is Excursion:
         table = 'excursions'
+    elif type(update) is UserExcursion:
+        table = 'user_excursions'
     elif type(update) is Track:
         table = 'tracks'
     elif type(update) is ExcursionPoint:
@@ -112,7 +114,8 @@ def update_item(update: Union[User, Object, Excursion, Track, ExcursionPoint]) -
         return False
 
 
-def get_data_by_id(id: int, collection_name: str) -> Union[User, Object, Excursion, Track, ExcursionPoint]:
+def get_data_by_id(id: int, collection_name: str) -> Union[User, Object, Excursion, Track, ExcursionPoint,
+                                                           UserExcursion]:
     """
     Get an item from the collection by id
     :param id: id of the item you are looking for
@@ -133,6 +136,8 @@ def get_data_by_id(id: int, collection_name: str) -> Union[User, Object, Excursi
             data = Track(**data)
         elif collection_name == 'excursion_points':
             data = ExcursionPoint(**data)
+        elif collection_name == 'user_excursions':
+            data = UserExcursion(**data)
         else:
             return None
     return data
@@ -158,6 +163,8 @@ def get_all_items(collection_name: str) -> Union[List[User], List[Object], List[
         list_items = [Track(**track_data) for track_data in data]
     elif collection_name == 'excursion_points':
         list_items = [ExcursionPoint(**point_data) for point_data in data]
+    elif collection_name == 'user_excursions':
+        list_items = [UserExcursion(**user_excursion_data) for user_excursion_data in data]
     else:
         return None
     return list_items
@@ -179,6 +186,8 @@ def get_items_by_list_id(collection_name: str, list_id: List[int]) -> Union[List
         list_items = [Track(**track_data) for track_data in data]
     elif collection_name == 'excursion_points':
         list_items = [ExcursionPoint(**point_data) for point_data in data]
+    elif collection_name == 'user_excursions':
+        list_items = [UserExcursion(**user_excursion_data) for user_excursion_data in data]
     else:
         return None
     return list_items
@@ -251,16 +260,6 @@ def get_excursions() -> List[Excursion]:
     return list_excursions
 
 
-# EXCURSION POINTS
-
-def get_points(excursion_id: int) -> List[ExcursionPoint]:
-    db = Database()
-    collection = db.get_collection('excursion_points')
-    data = collection.find({'id_excursion': excursion_id})
-    list_points = [ExcursionPoint(**point_data) for point_data in data]
-    return list_points
-
-
 def update_url(excursion: Excursion) -> bool:
     """
     Updates an url the excursion in the collection
@@ -281,6 +280,26 @@ def update_url(excursion: Excursion) -> bool:
         return False
 
 
+# EXCURSION POINTS
+
+def get_points(excursion_id: int) -> List[ExcursionPoint]:
+    db = Database()
+    collection = db.get_collection('excursion_points')
+    data = collection.find({'id_excursion': excursion_id}).sort('sequence_number')
+    list_points = [ExcursionPoint(**point_data) for point_data in data]
+    return list_points
+
+
+def check_track_in_excursion(excursion_id: int, track_id: int) -> ExcursionPoint:
+    db = Database()
+    collection = db.get_collection('excursion_points')
+    point_data = collection.find_one({'$and': [{'id_excursion': excursion_id}, {'id_track': track_id}]})
+    if point_data:
+        return ExcursionPoint(**point_data)
+    else:
+        return None
+
+
 # TRACK
 
 def get_track_by_name(name: str) -> Track:
@@ -294,6 +313,58 @@ def get_track_by_name(name: str) -> Track:
     track_data = collection.find_one({'name': name})
     if track_data:
         return Track(**track_data)
+    else:
+        return None
+
+
+# USER EXCURSIONS
+
+def get_user_excursion_by_user_id(user_id: int) -> List[UserExcursion]:
+    db = Database()
+    collection = db.get_collection('user_excursions')
+    data = collection.find({'$and': [
+        {'id_user': user_id},
+        {'is_active': True}]})
+    list_user_excursions = [UserExcursion(**user_excursion_data) for user_excursion_data in data]
+    return list_user_excursions
+
+
+def deactivating_user_excursion(user_excursion_id: int) -> bool:
+    db = Database()
+    user_excursions = db.get_collection('user_excursions')
+    try:
+        count = user_excursions.update_one({'_id': user_excursion_id}, {'$set': {'is_active': False}}).modified_count
+        if count == 1:
+            return True
+        else:
+            return False
+    except BaseException as e:  # If an exception is raised when adding to the database
+        print(f'Error: {e}')
+        user_excursions.update_one({'_id': user_excursion_id}, {'$set': {'is_active': True}})
+        return False
+
+
+def check_user_excursion_is_active(excursion_id: int) -> UserExcursion:
+    db = Database()
+    collection = db.get_collection('user_excursions')
+    data = collection.find_one({'$and': [
+        {'id_excursion': excursion_id},
+        {'is_active': True}]})
+    if data:
+        return UserExcursion(**data)
+    else:
+        return None
+
+
+def get_expired_user_excursions(days: int) -> List[UserExcursion]:
+    db = Database()
+    collection = db.get_collection('user_excursions')
+    date = datetime.now() - timedelta(days=days)
+    user_excursions = collection.find({'$and': [
+        {'is_active': True},
+        {'date_added': {'$lt': date}}]})
+    if user_excursions:
+        return [UserExcursion(**user_excursion) for user_excursion in user_excursions]
     else:
         return None
 

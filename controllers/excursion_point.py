@@ -4,7 +4,7 @@ from fastapi import HTTPException
 from starlette import status
 
 from database import db
-from models.excursion_point import ExcursionPoint, ExcursionPointUpdate
+from models.excursion_point import ExcursionPoint
 
 TABLE = 'excursion_points'
 
@@ -81,3 +81,10 @@ def update_excursion_point(point_id: int, id_object: int = None, id_track: int =
     else:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='Failed to update the excursion '
                                                                                       'point')
+
+
+def check_track_in_excursion(excursion_id: int, track_id: int) -> bool:
+    if db.check_track_in_excursion(excursion_id, track_id):
+        return True
+    else:
+        return False

@@ -2,7 +2,7 @@ from fastapi import FastAPI
 
 from models.user import User
 from controllers.user import create_user
-from routes import auth, excursion, object, statistics, user,track
+from routes import auth, excursion, object, statistics, user, track
 from utils.auth import get_hash_password
 
 app = FastAPI(title="Excursion-Service",

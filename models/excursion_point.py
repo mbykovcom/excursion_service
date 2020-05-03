@@ -1,5 +1,3 @@
-from typing import List
-
 from pydantic import BaseModel, Field
 
 from .object import ObjectOut, Object
@@ -26,7 +24,6 @@ class ExcursionPointUpdate(BaseModel):
 
 class ExcursionPointDetails(BaseModel):
     id: int = Field(..., description='Excursion point id')
-    excursion: ExcursionPointOut = Field(..., description='Excursion data')
     object: ObjectOut = Field(..., description='Object data')
     track: TrackOut = Field(..., description='Track data')
     sequence_number: int = Field(..., description='Sequence of point in the route')
