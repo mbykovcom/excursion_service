@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from database.connection import Database
 from models.excursion import Excursion
 from models.excursion_point import ExcursionPoint
+from models.listening import Listening
 from models.object import Object, Coordinates
 from models.other import TableKey
 from models.track import Track
@@ -18,7 +19,6 @@ class TestBase:
 
     def setup_class(cls):
         cls.user = User('user@email.ru', get_hash_password('Password_1'), 'User')
-        cls.jwt = None
 
     def teardown_class(cls):
         db = Database()
@@ -75,7 +75,6 @@ class TestUser:
     def setup_class(cls):
         cls.user = User('user@email.ru', get_hash_password('Password_1'), 'User')
         db.add(cls.user)
-        cls.jwt = None
 
     def teardown_class(cls):
         db = Database()
@@ -114,7 +113,6 @@ class TestExcursion:
     def setup_class(cls):
         cls.excursion = Excursion(name='Excursion', description='Excursion`s description', price=100.5)
         db.add(cls.excursion)
-        cls.jwt = None
 
     def teardown_class(cls):
         db = Database()
@@ -142,7 +140,6 @@ class TestTrack:
     def setup_class(cls):
         cls.track = Track(1, 'Track')
         db.add(cls.track)
-        cls.jwt = None
 
     def teardown_class(cls):
         db = Database()
@@ -230,10 +227,80 @@ class TestUserExcursion:
         assert len(user_excursions) == 1
 
 
+class TestStatistics:
+    def setup_class(cls):
+        cls.now = datetime.now()
+        cls.users = [User('user1@email.ru', get_hash_password('Password_1'), 'User1', is_active=True,
+                          date_registration=(cls.now - timedelta(days=31))),
+                     User('user2@email.ru', get_hash_password('Password_1'), 'User2', is_active=True,
+                          date_registration=(cls.now - timedelta(days=10))),
+                     User('user3@email.ru', get_hash_password('Password_1'), 'User3', is_active=True,
+                          date_registration=(cls.now - timedelta(days=1)))]
+        cls.users[0] = db.add(cls.users[0])
+        cls.users[1] = db.add(cls.users[1])
+        cls.users[2] = db.add(cls.users[2])
+
+        cls.user_excursions = [UserExcursion(1, 1, True),
+                               UserExcursion(2, 1, True, date_added=cls.now - timedelta(days=22)),
+                               UserExcursion(3, 2, True, date_added=cls.now - timedelta(days=10))]
+        cls.user_excursions[0] = db.add(cls.user_excursions[0])
+        cls.user_excursions[1] = db.add(cls.user_excursions[1])
+        cls.user_excursions[2] = db.add(cls.user_excursions[2])
+
+        cls.listening = [Listening(1, 1, date_listening=cls.now - timedelta(minutes=2)),
+                         Listening(2, 1, date_listening=cls.now - timedelta(days=22)),
+                         Listening(3, 2, date_listening=cls.now - timedelta(days=10))]
+        cls.listening[0] = db.add(cls.listening[0])
+        cls.listening[1] = db.add(cls.listening[1])
+        cls.listening[2] = db.add(cls.listening[2])
+
+    def teardown_class(cls):
+        db = Database()
+        users = db.get_collection('users')
+        keys = db.get_collection('table_keys')
+        user_excursions = db.get_collection('user_excursions')
+        listening = db.get_collection('listening')
+        users.delete_many({})
+        keys.delete_many({})
+        user_excursions.delete_many({})
+        listening.delete_many({})
+
+    def test_get_user_statistics(self):
+        count = db.get_user_statistics(self.now - timedelta(days=5), self.now)
+        assert count == 1
+        count = db.get_user_statistics(self.now - timedelta(days=11), self.now)
+        assert count == 2
+        count = db.get_user_statistics(self.now - timedelta(days=32), self.now - timedelta(days=5))
+        assert count == 2
+
+    def test_get_excursion_statistics(self):
+        count = db.get_excursion_statistics(self.now - timedelta(days=5), self.now)
+        assert count == 1
+        count = db.get_excursion_statistics(self.now - timedelta(days=11), self.now)
+        assert count == 2
+        count = db.get_excursion_statistics(self.now - timedelta(days=32), self.now - timedelta(days=5))
+        assert count == 2
+
+    def test_get_sales_statistics(self):
+        excursions = db.get_sales_statistics(self.now - timedelta(days=31), self.now)
+        assert len(excursions) == 2
+        assert excursions[0]['_id'] == 1
+        assert excursions[0]['count'] == 2
+        assert excursions[1]['_id'] == 2
+        assert excursions[1]['count'] == 1
+
+    def test_get_listening_statistics(self):
+        count = db.get_listening_statistics(self.now - timedelta(minutes=50), self.now)
+        assert count == 1
+        count = db.get_listening_statistics(self.now - timedelta(days=11), self.now)
+        assert count == 2
+        count = db.get_listening_statistics(self.now - timedelta(days=32), self.now - timedelta(days=5))
+        assert count == 2
+
+
 class TestTableKey:
     def setup_class(cls):
         cls.user = User('user@email.ru', get_hash_password('Password_1'), 'User')
-        cls.jwt = None
 
     def teardown_class(cls):
         db = Database()

@@ -1,15 +1,17 @@
 import copy
-from datetime import timedelta
+from datetime import timedelta, datetime
 from time import sleep
 
 from starlette.testclient import TestClient
 
 from app import app
 from config import Config
+from database import db
 from database.connection import Database
 
 from models.excursion import Excursion
 from models.excursion_point import ExcursionPoint
+from models.listening import Listening
 from models.object import Object, Coordinates
 from models.track import Track
 from models.user import User, UserAuth
@@ -21,6 +23,7 @@ from utils.auth import get_hash_password
 from controllers import user as user_service
 from controllers import excursion as excursion_service
 from controllers import object as object_service
+from controllers import statistics as statistics_service
 
 client = TestClient(app)
 
@@ -378,7 +381,6 @@ class TestExcursion:
         assert response.json() == {'detail': 'An excursion with this id was not found'}
 
         response = client.delete(f"/excursion/{self.excursions[1]._id}/point/{self.points[0]._id}", headers=headers)
-        print(response.json())
         assert response.status_code == 200
         assert response.json() == {'id': self.points[0]._id,
                                    'id_excursion': self.points[0].id_excursion,
@@ -449,7 +451,8 @@ class TestExcursion:
         json = {'id_object': None, 'id_track': None}
         headers = {'jwt': self.jwt['admin']}
 
-        self.excursions[1].url_map_route = client.get(f"/excursion/{self.excursions[1]._id}", headers=headers).json()['url_map_route']
+        self.excursions[1].url_map_route = client.get(f"/excursion/{self.excursions[1]._id}", headers=headers).json()[
+            'url_map_route']
         response = client.put(f"/excursion/{self.excursions[1]._id}/point/{self.points[0]._id}", headers=headers,
                               json=json)
         assert response.status_code == 200
@@ -505,8 +508,9 @@ class TestTrack:
                         is_active=True)
         user_service.create_user(cls.user)
 
-        cls.jwt = {'admin': user_service.login(UserAuth(email=cls.admin.email, password='AdminPassword_1')).access_token,
-                   'user': user_service.login(UserAuth(email=cls.user.email, password='UserPassword_1')).access_token}
+        cls.jwt = {
+            'admin': user_service.login(UserAuth(email=cls.admin.email, password='AdminPassword_1')).access_token,
+            'user': user_service.login(UserAuth(email=cls.user.email, password='UserPassword_1')).access_token}
 
         cls.tracks = [Track('Track')]
         cls.track_binary = b'track'
@@ -630,7 +634,7 @@ class TestUserExcursion:
         cls.headers = {'user': {'jwt': user_service.login(UserAuth(email=cls.user.email,
                                                                    password='UserPassword_1')).access_token},
                        'admin': {'jwt': user_service.login(UserAuth(email=cls.admin.email,
-                                                                   password='AdminPassword_1')).access_token}}
+                                                                    password='AdminPassword_1')).access_token}}
 
         cls.objects = [Object(name='Object 1', description='Object`s description', location=Coordinates(lat=59.9390,
                                                                                                         lon=30.3157)),
@@ -639,7 +643,7 @@ class TestUserExcursion:
                        Object(name='Object 3', description='Object`s description', location=Coordinates(lat=59.938,
                                                                                                         lon=30.3167))]
         json = {'name': cls.objects[0].name, 'description': cls.objects[0].description,
-               'location': {'lat': cls.objects[0].location.lat, 'lon': cls.objects[0].location.lon}}
+                'location': {'lat': cls.objects[0].location.lat, 'lon': cls.objects[0].location.lon}}
         cls.objects[0]._id = client.post('/object', json=json, headers=cls.headers['admin']).json()['id']
         json = {'name': cls.objects[1].name, 'description': cls.objects[1].description,
                 'location': {'lat': cls.objects[1].location.lat, 'lon': cls.objects[1].location.lon}}
@@ -671,7 +675,6 @@ class TestUserExcursion:
         cls.tracks[2]._id = response['id']
         cls.tracks[2].url = response['url']
 
-
         cls.excursions = [Excursion(name='Excursion 1', description='Excursion`s description', price=100.5),
                           Excursion(name='Excursion 2', description='Excursion`s description', price=150.5)]
 
@@ -681,7 +684,6 @@ class TestUserExcursion:
         json = {'name': cls.excursions[1].name, 'description': cls.excursions[1].description,
                 'price': cls.excursions[1].price}
         cls.excursions[1]._id = client.post('/excursion', headers=cls.headers['admin'], json=json).json()['id']
-
 
         cls.points = [ExcursionPoint(id_excursion=cls.excursions[0]._id, id_object=cls.objects[0]._id,
                                      id_track=cls.tracks[0]._id, sequence_number=1),
@@ -727,9 +729,6 @@ class TestUserExcursion:
                                                  id_last_point=response['id_last_point'],
                                                  date_added=response['date_added'], is_active=response['is_active']))
 
-
-
-
     def teardown_class(cls):
         db = Database()
         users = db.get_collection('users')
@@ -739,6 +738,8 @@ class TestUserExcursion:
         tracks = db.get_collection('tracks')
         user_excursions = db.get_collection('user_excursions')
         keys = db.get_collection('table_keys')
+        listening = db.get_collection('listening')
+        listening.delete_many({})
         users.delete_many({})
         excursions.delete_many({})
         excursion_points.delete_many({})
@@ -802,3 +803,220 @@ class TestUserExcursion:
                               headers=self.headers['user'])
         assert response.status_code == 404
         assert response.json() == {'detail': 'The track with this id was not found'}
+
+
+class TestStatistics:
+    def setup_class(cls):
+        cls.now = datetime(2020, 5, 4, 18, 25)
+        cls.users = [User('user1@email.ru', get_hash_password('Password_1'), 'User1', is_active=True,
+                          date_registration=(cls.now - timedelta(minutes=21))),
+                     User('user2@email.ru', get_hash_password('Password_1'), 'User2', is_active=True,
+                          date_registration=(cls.now - timedelta(minutes=100))),
+                     User('user3@email.ru', get_hash_password('Password_1'), 'User3', is_active=True,
+                          date_registration=(datetime(2020, 5, 1, 18, 23))),
+                     User('user4@email.ru', get_hash_password('Password_1'), 'User4', is_active=True,
+                          date_registration=(datetime(2020, 4, 24, 10, 23))),
+                     User('user5@email.ru', get_hash_password('Password_1'), 'User5', is_active=True,
+                          date_registration=(datetime(2020, 1, 25, 22, 23)))]
+        cls.users[0] = user_service.create_user(cls.users[0])
+        cls.users[1] = user_service.create_user(cls.users[1])
+        cls.users[2] = user_service.create_user(cls.users[2])
+        cls.users[3] = user_service.create_user(cls.users[3])
+        cls.users[4] = user_service.create_user(cls.users[4])
+
+        cls.excursions = [Excursion(name='Excursion', description='Excursion`s description', price=100.5),
+                          Excursion(name='Excursion', description='Excursion`s description', price=21.5)]
+        cls.excursions[0] = excursion_service.create_excursion(cls.excursions[0])
+        cls.excursions[1] = excursion_service.create_excursion(cls.excursions[1])
+
+        cls.user_excursions = [UserExcursion(1, 1, True, date_added=(cls.now - timedelta(minutes=21))),
+                               UserExcursion(1, 1, False, date_added=(cls.now - timedelta(minutes=100))),
+                               UserExcursion(1, 1, False, date_added=(datetime(2020, 4, 25, 18, 23))),
+                               UserExcursion(1, 2, True, date_added=(datetime(2020, 4, 24, 10, 23))),
+                               UserExcursion(1, 2, True, date_added=(datetime(2020, 1, 25, 22, 23)))]
+        cls.user_excursions[0] = db.add(cls.user_excursions[0])
+        cls.user_excursions[1] = db.add(cls.user_excursions[1])
+        cls.user_excursions[2] = db.add(cls.user_excursions[2])
+        cls.user_excursions[3] = db.add(cls.user_excursions[3])
+        cls.user_excursions[4] = db.add(cls.user_excursions[4])
+
+        cls.listening = [Listening(1, 1, date_listening=cls.now - timedelta(minutes=7)),
+                         Listening(2, 1, date_listening=cls.now - timedelta(hours=22)),
+                         Listening(2, 1, date_listening=cls.now - timedelta(hours=21)),
+                         Listening(3, 2, date_listening=cls.now - timedelta(days=10))]
+
+        cls.listening[0] = statistics_service.add_listening(cls.listening[0])
+        cls.listening[1] = statistics_service.add_listening(cls.listening[1])
+        cls.listening[2] = statistics_service.add_listening(cls.listening[2])
+        cls.listening[3] = statistics_service.add_listening(cls.listening[3])
+
+        cls.admin = User(email='admin@email.ru', hash_password=get_hash_password('AdminPassword_1'), name='Admin',
+                         role='admin',
+                         is_active=True)
+        user_service.create_user(cls.admin)
+        cls.headers = {'admin': {'jwt': user_service.login(UserAuth(email=cls.admin.email,
+                                                                    password='AdminPassword_1')).access_token}}
+
+    def teardown_class(cls):
+        db = Database()
+        users = db.get_collection('users')
+        excursions = db.get_collection('excursions')
+        user_excursions = db.get_collection('user_excursions')
+        listening = db.get_collection('listening')
+        keys = db.get_collection('table_keys')
+        users.delete_many({})
+        excursions.delete_many({})
+        user_excursions.delete_many({})
+        listening.delete_many({})
+        keys.delete_many({})
+
+    def test_get_statistics_users(self):
+        json = {'start': str(self.now - timedelta(minutes=50)), 'end': str(self.now)}
+        response = client.get('/statistics/user', headers=self.headers['admin'], json=json)
+        assert response.status_code == 200
+        response = response.json()
+        assert response['type'] == 'minutes'
+        assert response['data']['2'] == 1
+
+        json = {'start': str(self.now - timedelta(hours=2)), 'end': str(self.now)}
+        response = client.get('/statistics/user', headers=self.headers['admin'], json=json)
+        assert response.status_code == 200
+        response = response.json()
+        assert response['type'] == 'hours'
+        assert response['data']['1'] == 1
+        assert response['data']['2'] == 1
+
+        json = {'start': None, 'end': None}
+        response = client.get('/statistics/user', headers=self.headers['admin'], json=json)
+        assert response.status_code == 200
+        response = response.json()
+        assert response['type'] == 'days'
+        assert response['data']['1'] == 2
+
+        json = {'start': str(self.now - timedelta(days=28)), 'end': str(self.now)}
+        response = client.get('/statistics/user', headers=self.headers['admin'], json=json)
+        assert response.status_code == 200
+        response = response.json()
+        assert response['type'] == 'weeks'
+        assert response['data']['3'] == 1
+        assert response['data']['4'] == 1
+
+        json = {'start': str(datetime(2019, 5, 1)), 'end': str(datetime(2020, 4, 30))}
+        response = client.get('/statistics/user', headers=self.headers['admin'], json=json)
+        assert response.status_code == 200
+        response = response.json()
+        assert response['type'] == 'months'
+        assert response['data']['9'] == 1
+        assert response['data']['12'] == 1
+
+    def test_get_statistics_excursions(self):
+        json = {'start': str(self.now - timedelta(minutes=50)), 'end': str(self.now)}
+        response = client.get('/statistics/excursion', headers=self.headers['admin'], json=json)
+        assert response.status_code == 200
+        response = response.json()
+        assert response['type'] == 'minutes'
+        assert response['data']['2'] == 1
+
+        json = {'start': str(self.now - timedelta(hours=2)), 'end': str(self.now)}
+        response = client.get('/statistics/excursion', headers=self.headers['admin'], json=json)
+        assert response.status_code == 200
+        response = response.json()
+        assert response['type'] == 'hours'
+        assert response['data']['1'] == 1
+        assert response['data']['2'] == 1
+
+        json = {'start': None, 'end': None}
+        response = client.get('/statistics/excursion', headers=self.headers['admin'], json=json)
+        assert response.status_code == 200
+        response = response.json()
+        assert response['type'] == 'days'
+        assert response['data']['1'] == 2
+
+        json = {'start': str(self.now - timedelta(days=28)), 'end': str(self.now)}
+        response = client.get('/statistics/excursion', headers=self.headers['admin'], json=json)
+        assert response.status_code == 200
+        response = response.json()
+        assert response['type'] == 'weeks'
+        assert response['data']['3'] == 2
+
+        json = {'start': str(datetime(2019, 5, 1)), 'end': str(datetime(2020, 4, 30))}
+        response = client.get('/statistics/excursion', headers=self.headers['admin'], json=json)
+        assert response.status_code == 200
+        response = response.json()
+        assert response['type'] == 'months'
+        assert response['data']['9'] == 1
+        assert response['data']['12'] == 2
+
+    def test_get_statistics_listening(self):
+        json = {'start': str(self.now - timedelta(minutes=50)), 'end': str(self.now)}
+        response = client.get('/statistics/listening', headers=self.headers['admin'], json=json)
+        assert response.status_code == 200
+        response = response.json()
+        assert response['type'] == 'minutes'
+        assert response['data']['3'] == 1
+
+        json = {'start': str(self.now - timedelta(hours=2)), 'end': str(self.now)}
+        response = client.get('/statistics/listening', headers=self.headers['admin'], json=json)
+        assert response.status_code == 200
+        response = response.json()
+        assert response['type'] == 'hours'
+        assert response['data']['2'] == 1
+
+        json = {'start': None, 'end': None}
+        response = client.get('/statistics/listening', headers=self.headers['admin'], json=json)
+        assert response.status_code == 200
+        response = response.json()
+        assert response['type'] == 'days'
+        assert response['data']['1'] == 1
+
+        json = {'start': str(self.now - timedelta(days=28)), 'end': str(self.now)}
+        response = client.get('/statistics/listening', headers=self.headers['admin'], json=json)
+        assert response.status_code == 200
+        response = response.json()
+        assert response['type'] == 'weeks'
+        assert response['data']['4'] == 2
+
+        json = {'start': str(datetime(2019, 5, 1)), 'end': str(datetime(2020, 4, 30))}
+        response = client.get('/statistics/listening', headers=self.headers['admin'], json=json)
+        assert response.status_code == 200
+        response = response.json()
+        assert response['type'] == 'months'
+        assert response['data']['12'] == 1
+
+    def test_get_statistics_sales(self):
+        json = {'start': str(self.now - timedelta(minutes=50)), 'end': str(self.now)}
+        response = client.get('/statistics/sales', headers=self.headers['admin'], json=json)
+        assert response.status_code == 200
+        response = response.json()
+        assert response['type'] == 'minutes'
+        assert response['data']['2'] == self.excursions[0].price
+
+        json = {'start': str(self.now - timedelta(hours=2)), 'end': str(self.now)}
+        response = client.get('/statistics/sales', headers=self.headers['admin'], json=json)
+        assert response.status_code == 200
+        response = response.json()
+        assert response['type'] == 'hours'
+        assert response['data']['1'] == self.excursions[0].price
+        assert response['data']['2'] == self.excursions[0].price
+
+        json = {'start': None, 'end': None}
+        response = client.get('/statistics/sales', headers=self.headers['admin'], json=json)
+        assert response.status_code == 200
+        response = response.json()
+        assert response['type'] == 'days'
+        assert response['data']['1'] == self.excursions[0].price * 2
+
+        json = {'start': str(self.now - timedelta(days=28)), 'end': str(self.now)}
+        response = client.get('/statistics/sales', headers=self.headers['admin'], json=json)
+        assert response.status_code == 200
+        response = response.json()
+        assert response['type'] == 'weeks'
+        assert response['data']['3'] == self.excursions[1].price + self.excursions[0].price
+
+        json = {'start': str(datetime(2019, 5, 1)), 'end': str(datetime(2020, 4, 30))}
+        response = client.get('/statistics/sales', headers=self.headers['admin'], json=json)
+        assert response.status_code == 200
+        response = response.json()
+        assert response['type'] == 'months'
+        assert response['data']['9'] == self.excursions[1].price
+        assert response['data']['12'] == self.excursions[1].price + self.excursions[0].price

@@ -4,6 +4,7 @@ from typing import List, Union
 from database.connection import Database
 from models.excursion import Excursion
 from models.excursion_point import ExcursionPoint
+from models.listening import Listening
 from models.object import Object
 from models.other import TableKey
 from models.track import Track
@@ -13,9 +14,8 @@ from models.user import User
 from models.user_excurion import UserExcursion
 
 
-def add(data: Union[User, Object, Excursion, UserExcursion, Track, ExcursionPoint]) -> Union[User, Object,
-                                                                                             Excursion, UserExcursion,
-                                                                                             Track, ExcursionPoint]:
+def add(data: Union[User, Object, Excursion, UserExcursion, Track, ExcursionPoint,
+                    Listening]) -> Union[User, Object, Excursion, UserExcursion, Track, ExcursionPoint, Listening]:
     """
     Adds an object to the collection
     :param data: object to add to the collection
@@ -34,6 +34,8 @@ def add(data: Union[User, Object, Excursion, UserExcursion, Track, ExcursionPoin
         table = 'tracks'
     elif type(data) is ExcursionPoint:
         table = 'excursion_points'
+    elif type(data) is Listening:
+        table = 'listening'
     else:
         return False
     collection = db.get_collection(table)
@@ -367,6 +369,48 @@ def get_expired_user_excursions(days: int) -> List[UserExcursion]:
         return [UserExcursion(**user_excursion) for user_excursion in user_excursions]
     else:
         return None
+
+
+# STATISTICS
+
+def get_user_statistics(start: datetime, end: datetime) -> int:
+    db = Database()
+    collection = db.get_collection('users')
+    users = collection.find({'$and': [
+        {'is_active': True},
+        {'date_registration': {'$gt': start}},
+        {'date_registration': {'$lt': end}}]})
+    return users.count()
+
+
+def get_excursion_statistics(start: datetime, end: datetime) -> int:
+    db = Database()
+    collection = db.get_collection('user_excursions')
+    user_excursions = collection.find({'$and': [
+        {'date_added': {'$gt': start}},
+        {'date_added': {'$lt': end}}]})
+    return user_excursions.count()
+
+
+def get_listening_statistics(start: datetime, end: datetime) -> int:
+    db = Database()
+    collection = db.get_collection('listening')
+    user_excursions = collection.find({'$and': [
+        {'date_listening': {'$gt': start}},
+        {'date_listening': {'$lt': end}}]})
+    return user_excursions.count()
+
+
+def get_sales_statistics(start: datetime, end: datetime):
+    db = Database()
+    collection = db.get_collection('user_excursions')
+    groups = collection.aggregate([
+        {'$match': {'$and': [
+            {'date_added': {'$gt': start}},
+            {'date_added': {'$lt': end}}]}},
+        {"$group": {"_id": "$id_excursion", "count": {"$sum": 1}}}
+    ])
+    return [group for group in groups]
 
 
 # TABLE KEYS

@@ -5,13 +5,15 @@ from datetime import datetime, timedelta
 from fastapi import HTTPException
 from pytest import raises
 
+from database import db
 from database.connection import Database
 from models.excursion_point import ExcursionPoint, ExcursionPointDetails
+from models.listening import Listening
 from models.track import Track
 from models.user import User, UserAuth
 from models.object import Object, Coordinates, ObjectUpdate
 from models.excursion import Excursion, ExcursionUpdate, ExcursionOut
-from models.other import Token
+from models.other import Token, Statistics
 from models.user_excurion import UserExcursion, UserExcursionsDetail, UserExcursionDetail
 
 from utils.auth import get_hash_password
@@ -21,6 +23,7 @@ from controllers import excursion as excursion_service
 from controllers import excursion_point as point_service
 from controllers import track as track_service
 from controllers import user_excursion as user_excursion_service
+from controllers import statistics as statistics_service
 
 
 class TestUser:
@@ -405,9 +408,9 @@ class TestExcursionPoints:
 
     def test_check_track_in_excursion(self):
         result = point_service.check_track_in_excursion(1, 2)
-        assert result is True
+        assert type(result) is ExcursionPoint
         result = point_service.check_track_in_excursion(1, 5)
-        assert result is False
+        assert result is None
 
     def test_delete_excursion_point(self):
         point = point_service.delete_excursion_point(self.points[2]._id)
@@ -496,6 +499,343 @@ class TestUserExcursions:
         assert type(user_excursion_detail) is UserExcursionsDetail
         assert type(user_excursion_detail.excursion) is ExcursionOut
         assert len(user_excursion_detail.list_point) == 2
+
+
+class TestStatistics:
+    def setup_class(cls):
+        cls.now = datetime(2020, 5, 4, 18, 25)
+        cls.users = [User('user1@email.ru', get_hash_password('Password_1'), 'User1', is_active=True,
+                          date_registration=(cls.now - timedelta(minutes=21))),
+                     User('user2@email.ru', get_hash_password('Password_1'), 'User2', is_active=True,
+                          date_registration=(cls.now - timedelta(minutes=100))),
+                     User('user3@email.ru', get_hash_password('Password_1'), 'User3', is_active=True,
+                          date_registration=(datetime(2020, 5, 1, 18, 23))),
+                     User('user4@email.ru', get_hash_password('Password_1'), 'User4', is_active=True,
+                          date_registration=(datetime(2020, 4, 24, 10, 23))),
+                     User('user5@email.ru', get_hash_password('Password_1'), 'User5', is_active=True,
+                          date_registration=(datetime(2020, 1, 25, 22, 23)))]
+        cls.users[0] = user_service.create_user(cls.users[0])
+        cls.users[1] = user_service.create_user(cls.users[1])
+        cls.users[2] = user_service.create_user(cls.users[2])
+        cls.users[3] = user_service.create_user(cls.users[3])
+        cls.users[4] = user_service.create_user(cls.users[4])
+
+        cls.excursions = [Excursion(name='Excursion', description='Excursion`s description', price=100.5),
+                          Excursion(name='Excursion', description='Excursion`s description', price=21.5)]
+        cls.excursions[0] = excursion_service.create_excursion(cls.excursions[0])
+        cls.excursions[1] = excursion_service.create_excursion(cls.excursions[1])
+
+        cls.user_excursions = [UserExcursion(1, 1, True, date_added=(cls.now - timedelta(minutes=21))),
+                               UserExcursion(1, 1, False, date_added=(cls.now - timedelta(minutes=100))),
+                               UserExcursion(1, 1, False, date_added=(datetime(2020, 5, 1, 18, 23))),
+                               UserExcursion(1, 2, True, date_added=(datetime(2020, 4, 24, 10, 23))),
+                               UserExcursion(1, 2, True, date_added=(datetime(2020, 1, 25, 22, 23)))]
+        cls.user_excursions[0] = db.add(cls.user_excursions[0])
+        cls.user_excursions[1] = db.add(cls.user_excursions[1])
+        cls.user_excursions[2] = db.add(cls.user_excursions[2])
+        cls.user_excursions[3] = db.add(cls.user_excursions[3])
+        cls.user_excursions[4] = db.add(cls.user_excursions[4])
+
+        cls.listening = [Listening(1, 1, date_listening=cls.now - timedelta(minutes=7)),
+                         Listening(2, 1, date_listening=cls.now - timedelta(hours=22)),
+                         Listening(3, 2, date_listening=cls.now - timedelta(days=10))]
+        cls.listening[0] = statistics_service.add_listening(cls.listening[0])
+        cls.listening[1] = statistics_service.add_listening(cls.listening[1])
+        cls.listening[2] = statistics_service.add_listening(cls.listening[2])
+
+    def teardown_class(cls):
+        db = Database()
+        users = db.get_collection('users')
+        excursions = db.get_collection('excursions')
+        user_excursions = db.get_collection('user_excursions')
+        listening = db.get_collection('listening')
+        keys = db.get_collection('table_keys')
+        users.delete_many({})
+        excursions.delete_many({})
+        user_excursions.delete_many({})
+        listening.delete_many({})
+        keys.delete_many({})
+
+    def test_specify_period(self):
+        period = statistics_service.specify_period(None, None)
+        assert period[0].day == 4
+        assert period[1].day == 10
+
+        now = datetime.now()
+        start = now - timedelta(days=3)
+        end = now + timedelta(days=10)
+        period = statistics_service.specify_period(start, end)
+        assert period[0].day == start.day
+        assert period[1].day == end.day
+
+        period = statistics_service.specify_period(None, end)
+        day = now.isoweekday()
+        assert period[0].day == (now - timedelta(days=day - 1)).day
+        assert period[1].day == end.day
+
+        period = statistics_service.specify_period(start, None)
+        assert period[0].day == start.day
+        assert period[1].day == now.day
+
+    def test_generating_segments(self):
+        start = self.now - timedelta(minutes=12)
+        end = self.now
+
+        period = statistics_service.specify_period(start, end)
+        segments = statistics_service.generating_segments(period)
+        assert segments is None
+
+        start = self.now - timedelta(minutes=50)
+        period = statistics_service.specify_period(start, end)
+        segments = statistics_service.generating_segments(period)
+        assert segments[0] == 'minutes'
+        assert segments[1][1][0] == start
+        assert segments[1][4][1] == end
+        assert len(segments[1]) == 4
+
+        start = self.now - timedelta(hours=7)
+        period = statistics_service.specify_period(start, end)
+        segments = statistics_service.generating_segments(period)
+        assert segments[0] == 'hours'
+        assert segments[1][1][0] == start
+        assert segments[1][7][1] == end
+        assert len(segments[1]) == 7
+
+        start = self.now - timedelta(days=7)
+        period = statistics_service.specify_period(start, end)
+        segments = statistics_service.generating_segments(period)
+        assert segments[0] == 'days'
+        assert segments[1][1][0] == datetime(year=start.year, month=start.month, day=start.day)
+        assert segments[1][7][1] == datetime(year=end.year, month=end.month, day=end.day) - timedelta(microseconds=1)
+        assert len(segments[1]) == 7
+
+        start = self.now - timedelta(days=31)
+        period = statistics_service.specify_period(start, end)
+        segments = statistics_service.generating_segments(period)
+        assert segments[0] == 'weeks'
+        assert segments[1][1][0] == datetime(year=start.year, month=start.month, day=start.day)
+        assert segments[1][5][1] == datetime(year=start.year, month=start.month, day=start.day) + timedelta(days=7*5) \
+               - timedelta(microseconds=1)
+        assert len(segments[1]) == 5
+
+        start = self.now - timedelta(days=365)
+        period = statistics_service.specify_period(start, end)
+        segments = statistics_service.generating_segments(period)
+        assert segments is None
+
+        start = datetime(2019, 5, 1)
+        end = datetime(2020, 4, 30)
+        period = statistics_service.specify_period(start, end)
+        segments = statistics_service.generating_segments(period)
+        assert segments[0] == 'months'
+        assert segments[1][1][0] == start
+        assert segments[1][12][1] == end + timedelta(days=1)\
+               - timedelta(microseconds=1)
+        assert len(segments[1]) == 12
+
+    def test_get_statistics_users(self):
+        start = self.now - timedelta(minutes=50)
+        period = statistics_service.specify_period(start, self.now)
+        statistics = statistics_service.get_statistics_users(period)
+        assert type(statistics) is Statistics
+        assert statistics.type == 'minutes'
+        assert len(statistics.data) == 4
+        assert statistics.data[1] == 0
+        assert statistics.data[2] == 1
+        assert statistics.data[3] == 0
+        assert statistics.data[4] == 0
+
+        start = self.now - timedelta(hours=2)
+        period = statistics_service.specify_period(start, self.now)
+        statistics = statistics_service.get_statistics_users(period)
+        assert type(statistics) is Statistics
+        assert statistics.type == 'hours'
+        assert len(statistics.data) == 2
+        assert statistics.data[1] == 1
+        assert statistics.data[2] == 1
+
+        start = self.now - timedelta(days=4)
+        period = statistics_service.specify_period(start, self.now)
+        statistics = statistics_service.get_statistics_users(period)
+        assert type(statistics) is Statistics
+        assert statistics.type == 'days'
+        assert len(statistics.data) == 4
+        assert statistics.data[1] == 0
+        assert statistics.data[2] == 1
+        assert statistics.data[3] == 0
+        assert statistics.data[4] == 0
+
+        start = self.now - timedelta(days=28)
+        period = statistics_service.specify_period(start, self.now)
+        statistics = statistics_service.get_statistics_users(period)
+        assert type(statistics) is Statistics
+        assert statistics.type == 'weeks'
+        assert len(statistics.data) == 4
+        assert statistics.data[1] == 0
+        assert statistics.data[2] == 0
+        assert statistics.data[3] == 1
+        assert statistics.data[4] == 1
+
+        start = datetime(2019, 5, 1)
+        end = datetime(2020, 4, 30)
+        period = statistics_service.specify_period(start, end)
+        statistics = statistics_service.get_statistics_users(period)
+        assert type(statistics) is Statistics
+        assert statistics.type == 'months'
+        assert len(statistics.data) == 12
+        assert statistics.data[9] == 1
+        assert statistics.data[12] == 1
+
+    def test_get_statistics_excursions(self):
+        start = self.now - timedelta(minutes=50)
+        period = statistics_service.specify_period(start, self.now)
+        statistics = statistics_service.get_statistics_excursions(period)
+        assert type(statistics) is Statistics
+        assert statistics.type == 'minutes'
+        assert len(statistics.data) == 4
+        assert statistics.data[1] == 0
+        assert statistics.data[2] == 1
+        assert statistics.data[3] == 0
+        assert statistics.data[4] == 0
+
+        start = self.now - timedelta(hours=2)
+        period = statistics_service.specify_period(start, self.now)
+        statistics = statistics_service.get_statistics_excursions(period)
+        assert type(statistics) is Statistics
+        assert statistics.type == 'hours'
+        assert len(statistics.data) == 2
+        assert statistics.data[1] == 1
+        assert statistics.data[2] == 1
+
+        start = self.now - timedelta(days=4)
+        period = statistics_service.specify_period(start, self.now)
+        statistics = statistics_service.get_statistics_excursions(period)
+        assert type(statistics) is Statistics
+        assert statistics.type == 'days'
+        assert len(statistics.data) == 4
+        assert statistics.data[1] == 0
+        assert statistics.data[2] == 1
+        assert statistics.data[3] == 0
+        assert statistics.data[4] == 0
+
+        start = self.now - timedelta(days=28)
+        period = statistics_service.specify_period(start, self.now)
+        statistics = statistics_service.get_statistics_excursions(period)
+        assert type(statistics) is Statistics
+        assert statistics.type == 'weeks'
+        assert len(statistics.data) == 4
+        assert statistics.data[1] == 0
+        assert statistics.data[2] == 0
+        assert statistics.data[3] == 1
+        assert statistics.data[4] == 1
+
+        start = datetime(2019, 5, 1)
+        end = datetime(2020, 4, 30)
+        period = statistics_service.specify_period(start, end)
+        statistics = statistics_service.get_statistics_excursions(period)
+        assert type(statistics) is Statistics
+        assert statistics.type == 'months'
+        assert len(statistics.data) == 12
+        assert statistics.data[9] == 1
+        assert statistics.data[12] == 1
+
+    def test_get_statistics_listening(self):
+        start = self.now - timedelta(minutes=50)
+        period = statistics_service.specify_period(start, self.now)
+        statistics = statistics_service.get_statistics_listening(period)
+        assert type(statistics) is Statistics
+        assert statistics.type == 'minutes'
+        assert len(statistics.data) == 4
+        assert statistics.data[3] == 1
+
+        start = self.now - timedelta(hours=2)
+        period = statistics_service.specify_period(start, self.now)
+        statistics = statistics_service.get_statistics_listening(period)
+        assert type(statistics) is Statistics
+        assert statistics.type == 'hours'
+        assert len(statistics.data) == 2
+        assert statistics.data[2] == 1
+
+        start = self.now - timedelta(days=4)
+        period = statistics_service.specify_period(start, self.now)
+        statistics = statistics_service.get_statistics_listening(period)
+        assert type(statistics) is Statistics
+        assert statistics.type == 'days'
+        assert len(statistics.data) == 4
+        assert statistics.data[4] == 1
+
+        start = self.now - timedelta(days=28)
+        period = statistics_service.specify_period(start, self.now)
+        statistics = statistics_service.get_statistics_listening(period)
+        assert type(statistics) is Statistics
+        assert statistics.type == 'weeks'
+        assert len(statistics.data) == 4
+        assert statistics.data[1] == 0
+        assert statistics.data[2] == 0
+        assert statistics.data[3] == 1
+        assert statistics.data[4] == 1
+
+        start = datetime(2019, 5, 1)
+        end = datetime(2020, 4, 30)
+        period = statistics_service.specify_period(start, end)
+        statistics = statistics_service.get_statistics_listening(period)
+        assert type(statistics) is Statistics
+        assert statistics.type == 'months'
+        assert len(statistics.data) == 12
+        assert statistics.data[12] == 1
+
+    def test_get_statistics_sales(self):
+        start = self.now - timedelta(minutes=50)
+        period = statistics_service.specify_period(start, self.now)
+        statistics = statistics_service.get_statistics_sales(period)
+        assert type(statistics) is Statistics
+        assert statistics.type == 'minutes'
+        assert len(statistics.data) == 4
+        assert statistics.data[1] == 0
+        assert statistics.data[2] == self.excursions[0].price
+        assert statistics.data[3] == 0
+        assert statistics.data[4] == 0
+
+        start = self.now - timedelta(hours=2)
+        period = statistics_service.specify_period(start, self.now)
+        statistics = statistics_service.get_statistics_sales(period)
+        assert type(statistics) is Statistics
+        assert statistics.type == 'hours'
+        assert len(statistics.data) == 2
+        assert statistics.data[1] == self.excursions[0].price
+        assert statistics.data[2] == self.excursions[0].price
+
+        start = self.now - timedelta(days=4)
+        period = statistics_service.specify_period(start, self.now)
+        statistics = statistics_service.get_statistics_sales(period)
+        assert type(statistics) is Statistics
+        assert statistics.type == 'days'
+        assert len(statistics.data) == 4
+        assert statistics.data[1] == 0
+        assert statistics.data[2] == self.excursions[0].price
+        assert statistics.data[3] == 0
+        assert statistics.data[4] == 0
+
+        start = self.now - timedelta(days=28)
+        period = statistics_service.specify_period(start, self.now)
+        statistics = statistics_service.get_statistics_sales(period)
+        assert type(statistics) is Statistics
+        assert statistics.type == 'weeks'
+        assert len(statistics.data) == 4
+        assert statistics.data[1] == 0
+        assert statistics.data[2] == 0
+        assert statistics.data[3] == self.excursions[1].price
+        assert statistics.data[4] == self.excursions[0].price
+
+        start = datetime(2019, 5, 1)
+        end = datetime(2020, 4, 30)
+        period = statistics_service.specify_period(start, end)
+        statistics = statistics_service.get_statistics_sales(period)
+        assert type(statistics) is Statistics
+        assert statistics.type == 'months'
+        assert len(statistics.data) == 12
+        assert statistics.data[9] == self.excursions[1].price
+        assert statistics.data[12] == self.excursions[1].price
 
 
 if __name__ == '__main__':

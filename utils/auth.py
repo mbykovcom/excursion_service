@@ -62,6 +62,8 @@ def authentication(token: str = Depends(oauth2_scheme), role: str = 'user') -> U
         headers={"WWW-Authenticate": "Bearer"},
     )
     access_exception = HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No access rights")
+    registration_exception = HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No access rights,"
+                                                                                         "please confirm registration.")
 
     try:
         payload = jwt.decode(token, Config.SECRET_KEY, algorithms=[Config.ALGORITHM])
@@ -73,6 +75,8 @@ def authentication(token: str = Depends(oauth2_scheme), role: str = 'user') -> U
     user = db.get_user_by_email(email)
     if user is None:
         raise credentials_exception
+    elif user.is_active is False:
+        raise registration_exception
     elif user.role == 'user' != role:
         raise access_exception
     return user

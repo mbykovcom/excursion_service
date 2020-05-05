@@ -3,12 +3,14 @@ from typing import List
 from fastapi import APIRouter, Header, HTTPException
 from starlette import status
 
+from models.listening import Listening
 from models.track import TrackOut
 from models.user_excurion import UserExcursionsDetail, UserExcursionDetail
 
 from controllers import user_excursion as user_excursion_service
 from controllers import excursion_point as point_service
 from controllers import track as track_service
+from controllers import statistics as statistics_service
 
 from utils import auth
 
@@ -37,7 +39,7 @@ async def get_user_excursion_by_id(user_excursion_id: int, jwt: str = Header(...
 
 @router.get('/excursion/{user_excursion_id}/play', status_code=status.HTTP_200_OK, response_model=TrackOut)
 async def get_last_track_user_excursion(user_excursion_id: int, jwt: str = Header(..., example='key')):
-    auth.authentication(jwt)
+    user = auth.authentication(jwt)
     user_excursion = user_excursion_service.get_user_excursion_by_id(user_excursion_id)
     if not user_excursion:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
@@ -46,21 +48,24 @@ async def get_last_track_user_excursion(user_excursion_id: int, jwt: str = Heade
         last_excursion_point = point_service.get_excursion_points_by_excursion(user_excursion.id_excursion)[0]
     else:
         last_excursion_point = point_service.get_excursion_point_by_id(user_excursion.id_last_point)
+    statistics_service.add_listening(Listening(id_user=user._id, id_excursion_point=last_excursion_point._id))
     track = track_service.get_track_by_id(last_excursion_point.id_track).track_out()
     return track
 
 
 @router.get('/excursion/{user_excursion_id}/play/{track_id}', status_code=status.HTTP_200_OK, response_model=TrackOut)
 async def get_track_user_excursion_by_id(user_excursion_id: int, track_id: int, jwt: str = Header(..., example='key')):
-    auth.authentication(jwt)
+    user = auth.authentication(jwt)
     user_excursion = user_excursion_service.get_user_excursion_by_id(user_excursion_id)
     if not user_excursion:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail='An user excursion with this id was not found')
 
-    if not point_service.check_track_in_excursion(user_excursion.id_excursion, track_id):
+    point = point_service.check_track_in_excursion(user_excursion.id_excursion, track_id)
+    if not point:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='The track with this id was not found')
     track = track_service.get_track_by_id(track_id)
     user_excursion.id_last_point = track_id
     user_excursion_service.update_last_point(user_excursion)
+    statistics_service.add_listening(Listening(id_user=user._id, id_excursion_point=point._id))
     return track.track_out()

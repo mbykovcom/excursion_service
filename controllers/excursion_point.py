@@ -83,8 +83,9 @@ def update_excursion_point(point_id: int, id_object: int = None, id_track: int =
                                                                                       'point')
 
 
-def check_track_in_excursion(excursion_id: int, track_id: int) -> bool:
-    if db.check_track_in_excursion(excursion_id, track_id):
-        return True
+def check_track_in_excursion(excursion_id: int, track_id: int) -> ExcursionPoint:
+    point = db.check_track_in_excursion(excursion_id, track_id)
+    if point:
+        return point
     else:
-        return False
+        return None
