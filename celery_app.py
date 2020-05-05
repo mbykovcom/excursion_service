@@ -16,6 +16,10 @@ celery.conf.beat_schedule = {
     "inactive_users": {
         "task": 'celery_app.clearing_inactive_users',
         'schedule': crontab(hour=Config.REGISTRATION_EXPIRE_HOURS - 1, minute=59)
+    },
+    "deactivate_user_excursions": {
+        "task": 'celery_app.deactivate_user_excursions',
+        'schedule': crontab(hour=23, minute=59)
     }
 }
 
@@ -49,12 +53,20 @@ def send_email(email, title, description) -> bool:
 
 @celery.task
 def clearing_inactive_users() -> bool:
+    """
+    Clears the database from unverified users within a day
+    :return: result
+    """
     users = user_service.get_users_inactive_24_hours()
     return user_service.delete_users([user._id for user in users])
 
 
 @celery.task
 def deactivate_user_excursions() -> bool:
+    """
+    Deactivating a user's tour after 30 days of purchase
+    :return: result True | False
+    """
     expired_user_excursions = db.get_expired_user_excursions(Config.USER_EXCURSION_EXPIRE_DAYS)
     count = 0
     for user_excursion in expired_user_excursions:

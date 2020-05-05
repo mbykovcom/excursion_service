@@ -7,7 +7,7 @@ from utils.auth import get_hash_password
 
 app = FastAPI(title="Excursion-Service",
               description="This service provides paid audio tours",
-              version="0.1", )
+              version="1", )
 
 admin = User(email='admin@email.ru', hash_password=get_hash_password('AdminPassword_1'), name='Admin', role='admin',
              is_active=True)

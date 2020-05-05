@@ -1,3 +1,7 @@
+"""
+Module for working with excursions
+"""
+
 from typing import List
 
 from fastapi import HTTPException
@@ -25,6 +29,11 @@ def create_excursion(excursion_data: Excursion) -> Excursion:
 
 
 def delete_excursion(excursion_id: int) -> Excursion:
+    """
+    Delete an excursion from the collection
+    :param excursion_id: id of the excursion to delete
+    :return: excursion deleted from the collection
+    """
     deleted_excursion = db.get_data_by_id(excursion_id, TABLE)
     result = db.delete(excursion_id, TABLE)
     if result:
@@ -41,10 +50,19 @@ def delete_excursion(excursion_id: int) -> Excursion:
 
 
 def get_excursion_by_id(excursion_id: int) -> Excursion:
+    """
+    Get an excursion from the collection by id
+    :param excursion_id: id of the excursion you are looking for
+    :return: desired excursion
+    """
     return db.get_data_by_id(excursion_id, TABLE)
 
 
 def get_excursions(role: str) -> List[Excursion]:
+    """
+    Get all excursions from the collection. For the user only those excursions that have a link to the route.
+    :return: list of excursions
+    """
     if role == 'user':
         return db.get_excursions()
     else:
@@ -53,11 +71,11 @@ def get_excursions(role: str) -> List[Excursion]:
 
 def update_excursion(excursion_id: int, excursion_update: ExcursionUpdate) -> Excursion:
     """
-       Updates an excursion in the collection
-       :param excursion_id: Excursion id to update
-       :param excursion_update: update the data excursion
-       :return: updated excursion
-       """
+    Updates an excursion in the collection
+    :param excursion_id: Excursion id to update
+    :param excursion_update: update the data excursion
+    :return: updated excursion
+    """
     excursion = get_excursion_by_id(excursion_id)
     if not excursion:
         return None
@@ -80,6 +98,12 @@ def update_excursion(excursion_id: int, excursion_update: ExcursionUpdate) -> Ex
 
 
 def buy_excursion(excursion_id: int, user_id: int) -> UserExcursion:
+    """
+    Purchase an excursion and enter it in the list of purchased ones to the user.
+    :param excursion_id: id of the excursion that is purchased
+    :param user_id: id of the user who is purchasing
+    :return: object UserExcursion
+    """
     if db.check_user_excursion_is_active(excursion_id):
         raise HTTPException(status_code=500, detail='This excursion has already been added by the user')
     excursion = get_excursion_by_id(excursion_id)
@@ -89,6 +113,11 @@ def buy_excursion(excursion_id: int, user_id: int) -> UserExcursion:
 
 
 def update_url_map_route(excursion: Excursion) -> Excursion:
+    """
+    Updates the link to the tour route
+    :param excursion: object of the updated excursion
+    :return: updated excursion
+    """
     excursion_db = get_excursion_by_id(excursion._id)
     if not excursion_db:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='An excursion with this id was not found')

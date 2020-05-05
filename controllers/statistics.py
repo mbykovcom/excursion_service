@@ -1,3 +1,7 @@
+"""
+Module for working with statistics
+"""
+
 from datetime import datetime, timedelta
 from math import ceil
 from typing import Tuple
@@ -24,6 +28,12 @@ CALENDAR = {1: (datetime(2019, 1, 1, 0, 0), datetime(2019, 1, 31, 23, 59, 59, 99
 
 
 def specify_period(start: datetime, end: datetime) -> Tuple[datetime, datetime]:
+    """
+    Set the statistics period for incoming dates. If parameters were not passed during the current week.
+    :param start: Start date
+    :param end: End data
+    :return: Period for statistics in the form of a tuple (start date, end date)
+    """
     now = datetime.now()
     if start is None and end is None:
         day = now.isoweekday()
@@ -38,6 +48,13 @@ def specify_period(start: datetime, end: datetime) -> Tuple[datetime, datetime]:
 
 
 def generating_segments(period: Tuple[datetime, datetime]) -> Tuple[str, dict]:
+    """
+    Generates suitable time intervals for the specified period for further histogram formation
+    :param period: Period for statistics in the form of a tuple (start date, end date)
+    :return: A tuple in which the first value is the dimension of intervals, the second value is a dictionary
+    (the keys are the numbers of segments starting from the start date, and the values are a list of dates interval
+    [start date, end date])
+    """
     delta = period[1] - period[0]
     if delta < timedelta(minutes=15):
         return None
@@ -118,6 +135,11 @@ def generating_segments(period: Tuple[datetime, datetime]) -> Tuple[str, dict]:
 
 
 def get_statistics_users(period: Tuple[datetime, datetime]) -> Statistics:
+    """
+    Get the number of new users for the specified time interval
+    :param period: Interval for statistics
+    :return: object Statistics
+    """
     segments = generating_segments(period)
     if segments is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Invalid time interval')
@@ -129,6 +151,11 @@ def get_statistics_users(period: Tuple[datetime, datetime]) -> Statistics:
 
 
 def get_statistics_excursions(period: Tuple[datetime, datetime]) -> Statistics:
+    """
+    Get the number of purchased excursions for the specified time interval
+    :param period: Interval for statistics
+    :return: object Statistics
+    """
     segments = generating_segments(period)
     if segments is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Invalid time interval')
@@ -140,6 +167,11 @@ def get_statistics_excursions(period: Tuple[datetime, datetime]) -> Statistics:
 
 
 def get_statistics_listening(period: Tuple[datetime, datetime]) -> Statistics:
+    """
+    Get the number of listening for the specified time interval
+    :param period: Interval for statistics
+    :return: object Statistics
+    """
     segments = generating_segments(period)
     if segments is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Invalid time interval')
@@ -151,6 +183,11 @@ def get_statistics_listening(period: Tuple[datetime, datetime]) -> Statistics:
 
 
 def get_statistics_sales(period: Tuple[datetime, datetime]) -> Statistics:
+    """
+    Get the amount of purchased excursions for the specified period of time
+    :param period: Interval for statistics
+    :return: object Statistics
+    """
     segments = generating_segments(period)
     if segments is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Invalid time interval')
@@ -165,6 +202,11 @@ def get_statistics_sales(period: Tuple[datetime, datetime]) -> Statistics:
 
 
 def add_listening(listen: Listening) -> Listening:
+    """
+    Make an entry about listening in the database to generate statistics
+    :param listen: object Listening
+    :return: object Listening
+    """
     if listen._id is None:
         listen._id = db.get_last_id('listening').last_id
     return db.add(listen)

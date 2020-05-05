@@ -1,3 +1,7 @@
+"""
+Module for working with database
+"""
+
 from datetime import datetime, timedelta
 from typing import List, Union
 
@@ -17,9 +21,9 @@ from models.user_excurion import UserExcursion
 def add(data: Union[User, Object, Excursion, UserExcursion, Track, ExcursionPoint,
                     Listening]) -> Union[User, Object, Excursion, UserExcursion, Track, ExcursionPoint, Listening]:
     """
-    Adds an object to the collection
-    :param data: object to add to the collection
-    :return: added object
+    Adds an item to the collection
+    :param data: item to add to the collection
+    :return: added item
     """
     db = Database()
     if type(data) is User:
@@ -59,10 +63,10 @@ def add(data: Union[User, Object, Excursion, UserExcursion, Track, ExcursionPoin
 
 def delete(id: int, collection_name: str) -> bool:
     """
-    Deletes an object from the collection by id
-    :param id: object id
+    Deletes an item from the collection by id
+    :param id: item id
     :param collection_name: name of the collection to delete from
-    :return: result of operation
+    :return: result of operation True | False
     """
     db = Database()
     collection = db.get_collection(collection_name)
@@ -74,6 +78,12 @@ def delete(id: int, collection_name: str) -> bool:
 
 
 def delete_items_by_list_id(list_id: List[int], collection_name: str) -> bool:
+    """
+    Deletes a list item from the collection by list id
+    :param list_id: list item id
+    :param collection_name: name of the collection to delete from
+    :return: result of operation True | False
+    """
     db = Database()
     collection = db.get_collection(collection_name)
     count = collection.delete_many({'_id': {'$in': list_id}}).deleted_count
@@ -85,8 +95,8 @@ def delete_items_by_list_id(list_id: List[int], collection_name: str) -> bool:
 
 def update_item(update: Union[User, Object, Excursion, Track, ExcursionPoint, UserExcursion]) -> bool:
     """
-    Updates an object in the collection
-    :param update: Object to update
+    Updates an item in the collection
+    :param update: item to update
     :return: result of updating
     """
     db = Database()
@@ -148,7 +158,7 @@ def get_data_by_id(id: int, collection_name: str) -> Union[User, Object, Excursi
 def get_all_items(collection_name: str) -> Union[List[User], List[Object], List[Excursion], List[UserExcursion],
                                                  List[Track], List[ExcursionPoint]]:
     """
-    Get all objects from the collection
+    Get all items from the collection
     :param collection_name: collection name
     :return: list of items
     """
@@ -175,6 +185,12 @@ def get_all_items(collection_name: str) -> Union[List[User], List[Object], List[
 def get_items_by_list_id(collection_name: str, list_id: List[int]) -> Union[List[User], List[Object], List[Excursion],
                                                                             List[UserExcursion], List[Track],
                                                                             List[ExcursionPoint]]:
+    """
+    Get an list item from the collection by list id
+    :param list_id: list id of the item you are looking for
+    :param collection_name: name of the collection to search in
+    :return: desired list item
+    """
     db = Database()
     collection = db.get_collection(collection_name)
     data = collection.find({'_id': {'$in': list_id}})
@@ -199,10 +215,10 @@ def get_items_by_list_id(collection_name: str, list_id: List[int]) -> Union[List
 
 def get_user_by_email(email: str) -> User:
     """
-        Get a user by email
-        :param email: user's email address
-        :return: the desired user
-        """
+    Get a user by email
+    :param email: user's email address
+    :return: the desired user
+    """
     db = Database()
     collection = db.get_collection('users')
     user_data = collection.find_one({'email': email})
@@ -214,10 +230,10 @@ def get_user_by_email(email: str) -> User:
 
 def activate_user(email: str):
     """
-       Activates the user in the service
-       :param email: user's email address
-       :return: activation result
-       """
+   Activates the user in the service
+   :param email: user's email address
+   :return: activation result
+   """
     db = Database()
     users = db.get_collection('users')
     try:
@@ -234,9 +250,9 @@ def activate_user(email: str):
 
 def get_inactive(hour: int = None) -> List[User]:
     """
-        Get a list of users who are inactive within N hours after registration
-        :return: list of inactive users
-        """
+    Get a list of users who are inactive within N hours after registration
+    :return: list of inactive users
+    """
     db = Database()
     collection = db.get_collection('users')
     if hour is None:
@@ -255,6 +271,10 @@ def get_inactive(hour: int = None) -> List[User]:
 # EXCURSIONS
 
 def get_excursions() -> List[Excursion]:
+    """
+    Get all excursions from the collection. For the user only those excursions that have a link to the route.
+    :return: list of excursions
+    """
     db = Database()
     collection = db.get_collection('excursions')
     data = collection.find({'url_map_route': {'$ne': None}})
@@ -285,6 +305,10 @@ def update_url(excursion: Excursion) -> bool:
 # EXCURSION POINTS
 
 def get_points(excursion_id: int) -> List[ExcursionPoint]:
+    """
+    Get all excursion points from the collection.
+    :return: list of excursion points
+    """
     db = Database()
     collection = db.get_collection('excursion_points')
     data = collection.find({'id_excursion': excursion_id}).sort('sequence_number')
@@ -293,6 +317,12 @@ def get_points(excursion_id: int) -> List[ExcursionPoint]:
 
 
 def check_track_in_excursion(excursion_id: int, track_id: int) -> ExcursionPoint:
+    """
+    Checking whether this track exists in the specified excursion
+    :param excursion_id: id of the excursion
+    :param track_id:  id of the track
+    :return: If exists returns the excursion point, if not returns None
+    """
     db = Database()
     collection = db.get_collection('excursion_points')
     point_data = collection.find_one({'$and': [{'id_excursion': excursion_id}, {'id_track': track_id}]})
@@ -322,6 +352,11 @@ def get_track_by_name(name: str) -> Track:
 # USER EXCURSIONS
 
 def get_user_excursion_by_user_id(user_id: int) -> List[UserExcursion]:
+    """
+    Get all active user excursion of this user
+    :param user_id: id of the user you are looking for
+    :return: list of user excursion
+    """
     db = Database()
     collection = db.get_collection('user_excursions')
     data = collection.find({'$and': [
@@ -332,6 +367,11 @@ def get_user_excursion_by_user_id(user_id: int) -> List[UserExcursion]:
 
 
 def deactivating_user_excursion(user_excursion_id: int) -> bool:
+    """
+    Deactivating a user's tour after 30 days of purchase
+    :param user_excursion_id: id of the user excursion to deactivating
+    :return: user excursion deactivated
+    """
     db = Database()
     user_excursions = db.get_collection('user_excursions')
     try:
@@ -347,6 +387,11 @@ def deactivating_user_excursion(user_excursion_id: int) -> bool:
 
 
 def check_user_excursion_is_active(excursion_id: int) -> UserExcursion:
+    """
+    Check whether this user excursion is active for the user
+    :param excursion_id: id of the excursion you are looking for
+    :return: user excursion or None
+    """
     db = Database()
     collection = db.get_collection('user_excursions')
     data = collection.find_one({'$and': [
@@ -359,6 +404,11 @@ def check_user_excursion_is_active(excursion_id: int) -> UserExcursion:
 
 
 def get_expired_user_excursions(days: int) -> List[UserExcursion]:
+    """
+    Get a list of user excursions that have expired by usage period
+    :param days: The number of days that have passed
+    :return:  list of user excursion or None
+    """
     db = Database()
     collection = db.get_collection('user_excursions')
     date = datetime.now() - timedelta(days=days)
@@ -374,6 +424,12 @@ def get_expired_user_excursions(days: int) -> List[UserExcursion]:
 # STATISTICS
 
 def get_user_statistics(start: datetime, end: datetime) -> int:
+    """
+    Get the number of new users for the specified time interval
+    :param start: start date
+    :param end: end date
+    :return: number of users
+    """
     db = Database()
     collection = db.get_collection('users')
     users = collection.find({'$and': [
@@ -384,6 +440,12 @@ def get_user_statistics(start: datetime, end: datetime) -> int:
 
 
 def get_excursion_statistics(start: datetime, end: datetime) -> int:
+    """
+    Get the number of purchased excursions for the specified time interval
+    :param start: start date
+    :param end: end date
+    :return: number of purchased excursions
+    """
     db = Database()
     collection = db.get_collection('user_excursions')
     user_excursions = collection.find({'$and': [
@@ -393,6 +455,12 @@ def get_excursion_statistics(start: datetime, end: datetime) -> int:
 
 
 def get_listening_statistics(start: datetime, end: datetime) -> int:
+    """
+    Get the number of listening for the specified time interval
+    :param start: start date
+    :param end: end date
+    :return: number of listening
+    """
     db = Database()
     collection = db.get_collection('listening')
     user_excursions = collection.find({'$and': [
@@ -402,6 +470,12 @@ def get_listening_statistics(start: datetime, end: datetime) -> int:
 
 
 def get_sales_statistics(start: datetime, end: datetime):
+    """
+    Get the amount of purchased excursions for the specified period of time
+    :param start: start date
+    :param end: end date
+    :return: amount of purchased excursions
+    """
     db = Database()
     collection = db.get_collection('user_excursions')
     groups = collection.aggregate([

@@ -1,3 +1,7 @@
+"""
+Module for working with object
+"""
+
 from typing import List
 
 from fastapi import HTTPException
@@ -50,11 +54,11 @@ def get_object_by_id(id: int) -> Object:
 
 def update_object(object_id: int, obj_update: ObjectUpdate) -> Object:
     """
-       Updates an object in the collection
-       :param object_id: Object id to update
-       :param obj_update: update the data object
-       :return: updated object
-       """
+   Updates an object in the collection
+   :param object_id: Object id to update
+   :param obj_update: update the data object
+   :return: updated object
+   """
     obj = get_object_by_id(object_id)
     if not obj:
         return None
@@ -71,5 +75,10 @@ def update_object(object_id: int, obj_update: ObjectUpdate) -> Object:
 
 
 def get_objects_by_list_id(list_id: List[int]) -> List[Object]:
+    """
+    Get an list object from the collection by list id
+    :param list_id: list id of the object you are looking for
+    :return: desired list object
+    """
     list = db.get_items_by_list_id('objects', list_id)
     return list

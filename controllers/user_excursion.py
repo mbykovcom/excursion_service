@@ -1,3 +1,7 @@
+"""
+Module for working with user excursions
+"""
+
 from typing import List
 
 from fastapi import HTTPException
@@ -45,7 +49,8 @@ def deactivate_user_excursion(user_excursion_id: int) -> UserExcursion:
 
 def get_user_excursions_by_user_id(user_id: int) -> List[UserExcursion]:
     """
-    Get all user excursion from the collection
+    Get all active user excursion of this user
+    :param user_id: id of the user you are looking for
     :return: list of user excursion
     """
     return db.get_user_excursion_by_user_id(user_id)
@@ -62,10 +67,10 @@ def get_user_excursion_by_id(id: int) -> UserExcursion:
 
 def update_last_point(user_excursion: UserExcursion) -> UserExcursion:
     """
-       Updates an excursion in the collection
-       :param user_excursion: update the data user excursion
-       :return: updated user excursion
-       """
+    Updates an excursion in the collection
+    :param user_excursion: update the data user excursion
+    :return: updated user excursion
+    """
     if db.update_item(user_excursion):
         return user_excursion
     else:
@@ -73,6 +78,11 @@ def update_last_point(user_excursion: UserExcursion) -> UserExcursion:
 
 
 def user_excursions_detail(user_excursion: UserExcursion) -> UserExcursionDetail:
+    """
+    Generate detailed information about an user excursion with detailed information about the last excursion point
+    :param user_excursion: object UserExcursion
+    :return: detailed information about an user excursion
+    """
     excursion = excursion_service.get_excursion_by_id(user_excursion.id_excursion).excursion_out()
     if user_excursion.id_last_point == 0:
         point = point_service.get_excursion_points_by_excursion(user_excursion.id_excursion)[0]
@@ -87,6 +97,11 @@ def user_excursions_detail(user_excursion: UserExcursion) -> UserExcursionDetail
 
 
 def user_excursion_detail(user_excursion: UserExcursion) -> UserExcursionsDetail:
+    """
+    Generate detailed information about an user excursion with a detailed list of all points on this user excursion
+    :param user_excursion: object UserExcursion
+    :return: detailed information about an user excursion
+    """
     excursion = excursion_service.get_excursion_by_id(user_excursion.id_excursion).excursion_out()
     points = point_service.get_excursion_points_by_excursion(user_excursion.id_excursion)
     list_point = []

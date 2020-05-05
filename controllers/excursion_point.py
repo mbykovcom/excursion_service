@@ -1,3 +1,7 @@
+"""
+Module for working with excursion points
+"""
+
 from typing import List
 
 from fastapi import HTTPException
@@ -36,6 +40,11 @@ def create_excursion_point(point_data: ExcursionPoint) -> ExcursionPoint:
 
 
 def delete_excursion_point(point_id: int) -> ExcursionPoint:
+    """
+    Delete an excursion point from the collection
+    :param point_id: id of the excursion point to delete
+    :return: excursion point deleted from the collection
+    """
     deleted_point = db.get_data_by_id(point_id, TABLE)
     result = db.delete(point_id, TABLE)
     if result:
@@ -45,25 +54,39 @@ def delete_excursion_point(point_id: int) -> ExcursionPoint:
 
 
 def get_excursion_point_by_id(point_id: int) -> ExcursionPoint:
+    """
+    Get an excursion point from the collection by id
+    :param point_id: id of the excursion point you are looking for
+    :return: desired excursion point
+    """
     return db.get_data_by_id(point_id, TABLE)
 
 
 def get_excursion_points() -> List[ExcursionPoint]:
+    """
+    Get all excursion points from the collection.
+    :return: list of excursion points
+    """
     return db.get_all_items(TABLE)
 
 
 def get_excursion_points_by_excursion(excursion_id: int) -> List[ExcursionPoint]:
+    """
+    Get an excursion point from the collection by id excursion
+    :param excursion_id: id of the excursion you are looking for
+    :return: desired list of excursion points
+    """
     return db.get_points(excursion_id)
 
 
 def update_excursion_point(point_id: int, id_object: int = None, id_track: int = None) -> ExcursionPoint:
     """
-       Updates an excursion point in the collection
-       :param point_id: Excursion point id to update
-       :param id_track: new id_track the excursion point
-       :param id_object: new id_object the excursion point
-       :return: updated excursion point
-       """
+    Updates an excursion point in the collection
+    :param point_id: Excursion point id to update
+    :param id_track: new id_track the excursion point
+    :param id_object: new id_object the excursion point
+    :return: updated excursion point
+    """
     point = get_excursion_point_by_id(point_id)
     if not point:
         return None
@@ -84,6 +107,12 @@ def update_excursion_point(point_id: int, id_object: int = None, id_track: int =
 
 
 def check_track_in_excursion(excursion_id: int, track_id: int) -> ExcursionPoint:
+    """
+    Checking whether this track exists in the specified excursion
+    :param excursion_id: id of the excursion
+    :param track_id:  id of the track
+    :return: If exists returns the excursion point, if not returns None
+    """
     point = db.check_track_in_excursion(excursion_id, track_id)
     if point:
         return point

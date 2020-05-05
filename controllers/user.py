@@ -1,3 +1,7 @@
+"""
+Module for working with user
+"""
+
 from datetime import timedelta
 from typing import List
 
@@ -10,10 +14,10 @@ from utils import auth
 
 def create_user(user_data: User) -> User:
     """
-       Add a new user to the collection
-       :param user_data: user data
-       :return: user added to the collection
-       """
+   Add a new user to the collection
+   :param user_data: user data
+   :return: user added to the collection
+   """
     if user_data._id is None:
         user_data._id = db.get_last_id('users').last_id
     return db.add(user_data)
@@ -65,10 +69,10 @@ def get_users_inactive_24_hours() -> List[User]:
 
 def delete_user(id: int) -> User:
     """
-        Delete an user from the collection
-        :param id: id of the user to delete
-        :return: user deleted from the collection
-        """
+    Delete an user from the collection
+    :param id: id of the user to delete
+    :return: user deleted from the collection
+    """
     user = db.get_data_by_id(id, 'users')
     if user:
         if db.delete(id, 'users'):
@@ -78,8 +82,8 @@ def delete_user(id: int) -> User:
 
 def delete_users(list_id: List[int]) -> bool:
     """
-           Delete an users from the collection
-           :param list_id: list of user IDs to delete
-           :return: the result of the removal
-           """
+    Delete an users from the collection
+    :param list_id: list of user IDs to delete
+    :return: the result of the removal
+    """
     return db.delete_items_by_list_id(list_id, 'users')

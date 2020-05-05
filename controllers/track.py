@@ -1,3 +1,7 @@
+"""
+Module for working with track
+"""
+
 from typing import List
 
 from fastapi import HTTPException
@@ -66,12 +70,12 @@ def get_track_by_id(id: int) -> Track:
 
 def update_track(track_id: int, track_binary: bytes = None, name: str = None) -> Track:
     """
-       Updates an track in the collection
-       :param track_id: Track id to update
-       :param track_binary: update the data track
-       :param name: update the name of the track
-       :return: updated track
-       """
+    Updates an track in the collection
+    :param track_id: Track id to update
+    :param track_binary: update the data track
+    :param name: update the name of the track
+    :return: updated track
+    """
     if track_binary is None and name is None:
         return None
     track = get_track_by_id(track_id)
@@ -109,6 +113,11 @@ def update_track(track_id: int, track_binary: bytes = None, name: str = None) ->
 
 
 def get_tracks_by_list_id(list_id: List[int]) -> List[Track]:
+    """
+    Get an list track from the collection by list id
+    :param list_id: list id of the track you are looking for
+    :return: desired list track
+    """
     list = db.get_items_by_list_id('tracks', list_id)
     return list
 
@@ -117,6 +126,10 @@ def get_tracks_by_list_id(list_id: List[int]) -> List[Track]:
 
 
 def create_client_s3():
+    """
+    Create a client for working with DigitalOcean storage
+    :return: client DigitalOcean storage
+    """
     session = boto3.session.Session()
     client = session.client('s3',
                             region_name=Config.REGION,
@@ -127,6 +140,12 @@ def create_client_s3():
 
 
 def add_track_in_cloud(track_data: bytes, name: str):
+    """
+    Upload a file to DigitalOcean storage
+    :param track_data: file in binary format
+    :param name: File name
+    :return: result True | False
+    """
     client_s3 = create_client_s3()
     result = client_s3.put_object(Bucket=Config.BUCKET, Key=f'{name}.mp3', Body=track_data)
     if result['ResponseMetadata']['HTTPStatusCode'] == 200:
@@ -136,12 +155,22 @@ def add_track_in_cloud(track_data: bytes, name: str):
 
 
 def get_track_from_cloud(name: str) -> bytes:
+    """
+    Get a file from the DigitalOcean storage by file name
+    :param name: File name
+    :return: file in binary format
+    """
     client_s3 = create_client_s3()
     result = client_s3.get_object(Bucket=Config.BUCKET, Key=f'{name}.mp3')
     return result['Body'].read()
 
 
 def delete_track_form_cloud(name: str):
+    """
+    Delete a file from the DigitalOcean storage by file name
+    :param name: File name
+    :return: result True | False
+    """
     client_s3 = create_client_s3()
     result = client_s3.delete_object(Bucket=Config.BUCKET, Key=name)
     if result['ResponseMetadata']['HTTPStatusCode'] == 204:  # Boto3 bug: always returns 204
