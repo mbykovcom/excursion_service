@@ -10,7 +10,7 @@ cffi==1.14.0
 chardet==3.0.4
 click==7.1.1
 coverage==5.1
-cryptography==2.9
+cryptography==3.2
 dnspython==1.16.0
 docker==4.2.0
 docutils==0.15.2
